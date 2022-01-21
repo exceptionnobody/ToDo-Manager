@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id" : "http://www.my-schema.com/mqtt_message_schema.json",
+  "title": "MQTT Message",
+  "description": "JSON Schema for MQTT Message",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "path to the JSON Schema to use for the validation of the JSON file describing the MQTT Message"
+    },
+    "status": {
+      "type": "string",
+      "description": "current condition of the task (the available types are active if it is selected by a user, inactive if it is not selected by any user, or deleted if it has been removed from the service)",
+      "enum": ["active", "inactive", "deleted"]
+    },
+    "userId": {
+      "type": "integer",
+      "description": "identified of the user"
+    },
+    "userName": {
+      "type": "string",
+      "description": "name of the user"
+    }
+  },
+  "required": ["status"],
+  "allOf": [
+    {
+      "if": {
+        "properties": { "typeMessage": { "const": "active" } }
+      },
+      "then": {
+        "required": ["userId", "userName"]
+      }
+    }
+  ]
+}
