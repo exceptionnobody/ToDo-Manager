@@ -69,13 +69,13 @@ const TaskRowControl = (props) => {
       <div className="ml-10">
         { (filter == 'owned') ? 
             [
-              <Button variant="link" className="shadow-none" onClick={onEdit}><PencilSquare /></Button>,
-              <Button variant="link" className="shadow-none" onClick={onDelete}><Trash /></Button>
+              <Button key={task.id+29} variant="link" className="shadow-none" onClick={onEdit}><PencilSquare /></Button>,
+              <Button key={task.id+13}variant="link" className="shadow-none" onClick={onDelete}><Trash /></Button>
             ]
           : 
           task.completed ? 
-            <Button variant="success" className="shadow-none" disabled>Completed</Button> :
-            <Button variant="success" className="shadow-none" onClick={onComplete}>Complete</Button>
+            <Button key={task.id+37} variant="success" className="shadow-none" disabled>Completed</Button> :
+            <Button key={task.id+17} variant="success" className="shadow-none" onClick={onComplete}>Complete</Button>
         }
       </div>
     </>
@@ -95,7 +95,7 @@ const ContentList = (props) => {
 
   return (
     <>
-      <ListGroup as="ul" variant="flush">
+      <ListGroup key={"ListTask"} as="ul" variant="flush">
         {
           tasks.map(t => {
             return (
@@ -108,14 +108,15 @@ const ContentList = (props) => {
         }
       </ListGroup>
       <Pagination 
+          key={"Pagination"}
           itemClass="page-item" // add it for bootstrap 4
           linkClass="page-link" // add it for bootstrap 4
-          activePage={localStorage.getItem("currentPage")}
-          itemsCountPerPage={localStorage.getItem("totalItems")/localStorage.getItem("totalPages")}
-          totalItemsCount={localStorage.getItem("totalItems")}
+          activePage={parseInt(localStorage.getItem("currentPage"))}
+          itemsCountPerPage={parseInt(localStorage.getItem("totalItems"))/parseInt(localStorage.getItem("totalPages"))}
+          totalItemsCount={parseInt(localStorage.getItem("totalItems"))}
           pageRangeDisplayed={10}
           onChange={handlePageChange}
-          pageSize ={localStorage.getItem("totalPages")}
+          pageSize ={parseInt(localStorage.getItem("totalPages"))}
       />
     </>
   )

@@ -325,8 +325,6 @@ const getUsers = () => {
             client.subscribe( String(tasks[i].id), { qos: 0 ,retain:true});
             console.log("Subscribing to "+tasks[i].id)
           }  
-          console.log("Public Task Topic.")
-          client.subscribe("PublicTasks", {qos:0})
           setTaskList(tasks);
           setDirty(false);
         })
@@ -379,6 +377,8 @@ const getUsers = () => {
 
       setUser(user);
       setLoggedIn(true);
+      console.log("Public Task Topic.")
+      client.subscribe("PublicTasks", {qos:0})
     }
     catch (err) {
       // error is handled and visualized in the login form, do not manage error, throw it
@@ -396,6 +396,8 @@ const getUsers = () => {
     localStorage.removeItem('userId');
     localStorage.removeItem('email');
     localStorage.removeItem('username');
+    
+    client.unsubscribe("PublicTasks")
   }
 
  

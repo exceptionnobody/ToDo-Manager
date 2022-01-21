@@ -8,7 +8,7 @@ const MiniOnlineList = (props) => {
 
     const createUserItem = (user) => {
         return (
-            <ListGroup.Item><img src={require("../world.png").default} alt={"Eagle"} width="20" height="20"  />{ " User: "+user.userName}</ListGroup.Item>
+            <ListGroup.Item key={user.userName}><img src={require("../world.png").default} alt={"Eagle"} width="20" height="20"  />{ " User: "+user.userName}</ListGroup.Item>
         );
     }
         

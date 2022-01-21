@@ -69,12 +69,12 @@ const PublicList = (props) => {
       <Pagination 
           itemClass="page-item" // add it for bootstrap 4
           linkClass="page-link" // add it for bootstrap 4
-          activePage={localStorage.getItem("currentPage")}
-          itemsCountPerPage={localStorage.getItem("totalItems")/localStorage.getItem("totalPages")}
-          totalItemsCount={localStorage.getItem("totalItems")}
+          activePage={parseInt(localStorage.getItem("currentPage"))}
+          itemsCountPerPage={parseInt(localStorage.getItem("totalItems"))/parseInt(localStorage.getItem("totalPages"))}
+          totalItemsCount={parseInt(localStorage.getItem("totalItems"))}
           pageRangeDisplayed={10}
           onChange={handlePageChange}
-          pageSize ={localStorage.getItem("totalPages")}
+          pageSize ={parseInt(localStorage.getItem("totalPages"))}
       />
     </>
   )
