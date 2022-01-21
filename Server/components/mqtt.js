@@ -4,7 +4,7 @@ var mqtt = require('mqtt');
 var Assignments = require('../service/AssignmentsService');
 var MQTTTaskMessage = require('./mqtt_task_message.js');
 
-var host = 'ws://127.0.0.1:8080';
+var host = 'ws://localhost:8080';
 var clientId = 'mqttjs_' + Math.random().toString(16).substr(2, 8);
 var options = {
   keepalive: 30,
