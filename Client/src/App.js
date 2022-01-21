@@ -251,7 +251,11 @@ const Main = () => {
   const getPublicTasks = () => {
       API.getPublicTasks()
         .then(tasks => {
-          setTaskList(tasks);
+            for (var i = 0; i < tasks.length; i++) {
+              client.subscribe( String(tasks[i].id), { qos: 0 });
+              console.log("Subscribing to public task: "+tasks[i].id)
+            }
+            setTaskList(tasks);
         })
         .catch(e => handleErrors(e));
   }
@@ -320,7 +324,9 @@ const getUsers = () => {
           for (var i = 0; i < tasks.length; i++) {
             client.subscribe( String(tasks[i].id), { qos: 0 ,retain:true});
             console.log("Subscribing to "+tasks[i].id)
-         }  
+          }  
+          console.log("Public Task Topic.")
+          client.subscribe("PublicTasks", {qos:0})
           setTaskList(tasks);
           setDirty(false);
         })
