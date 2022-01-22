@@ -5,7 +5,7 @@ var Assignments = require('../service/AssignmentsService');
 var MQTTTaskMessage = require('./mqtt_task_message.js');
 
 var host = 'ws://localhost:8080';
-var clientId = 'mqttjs_' + Math.random().toString(16).substr(2, 8);
+var clientId = 'mqttjs_server' + Math.random().toString(16).substr(2, 8);
 var options = {
   keepalive: 30,
   clientId: clientId,
@@ -50,7 +50,12 @@ mqtt_connection.on('close', function () {
 })
 
 module.exports.publishTaskMessage = function publishTaskMessage(taskId, message) {
-    mqtt_connection.publish(String(taskId), JSON.stringify(message), { qos: 0, retain: true })
+  //settare retain = true
+    mqtt_connection.publish(String(taskId), JSON.stringify(message), { qos: 0, retain:false})
+};
+
+module.exports.publishPublicTaskMessage = function publishPublicTaskMessage(message) {
+  mqtt_connection.publish("PublicTasks", JSON.stringify(message), { qos: 0 })
 };
 
 module.exports.saveMessage = function saveMessage(taskId, message) {

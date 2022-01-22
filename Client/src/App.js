@@ -23,6 +23,7 @@ import { Route, useRouteMatch, useHistory, Switch, Redirect } from 'react-router
 
 import dayjs from 'dayjs';
 import isToday from 'dayjs/plugin/isToday';
+import { Newspaper } from 'react-bootstrap-icons';
 dayjs.extend(isToday);
 
 const EventEmitter = require('events');
@@ -80,6 +81,7 @@ const Main = () => {
   const [loggedIn, setLoggedIn] = useState(false); // at the beginning, no user is logged in
   const [user, setUser] = useState(null);
 
+  const [pubTasks, setPubTasks] = useState([])
   // active filter is read from the current url
   const match = useRouteMatch('/list/:filter');
   const activeFilter = (match && match.params && match.params.filter) ? match.params.filter : 'owned';
@@ -106,11 +108,25 @@ const Main = () => {
     })
 
 
-    client.on('message', (topic,message) => {
+    client.on('message', function(topic,message) {
       try {
         var parsedMessage = JSON.parse(message);
-        if(parsedMessage.status == "deleted") client.unsubscribe(topic);
-        displayTaskSelection(topic, parsedMessage);
+
+        if(topic != "PublicTasks"){
+          if(parsedMessage.status == "deleted") 
+              client.unsubscribe(topic);
+          if(parsedMessage.status == "active" || parsedMessage.status == "inactive")
+            displayTaskSelection(topic, parsedMessage);
+          
+          if(parsedMessage.status == "remove")
+              updateB(topic)                   
+           
+       }else{
+          if(parsedMessage.status == "updateA")
+            updateA(parsedMessage)  
+                         
+
+        }
       } catch(e) {
           console.log(e);
       }
@@ -166,6 +182,22 @@ const Main = () => {
   }, [activeFilter])
 
 
+  function updateA(message){
+    client.subscribe(String(message.id, {qos:0}))
+    console.log("Parsed Message UpdateA")
+    console.log(message)
+    setPubTasks(state => {return [...state, message.task]})
+
+  }
+
+  function updateB(topic){
+    console.log("Parsed Message remove")
+    client.unsubscribe(topic)
+    console.log("topic: ", topic)
+    setPubTasks(oldstate => { return oldstate.filter((item)=>item.id !== parseInt(topic))  })
+             
+  }
+
   const displayTaskSelection = (topic, parsedMessage) => {
     handler.emit(topic,parsedMessage);
 
@@ -175,6 +207,7 @@ const Main = () => {
 
     setDirty(true);
   }
+
 
   const messageReceived = (e) => {
     let datas = JSON.parse(e.data.toString());
@@ -255,7 +288,8 @@ const Main = () => {
               client.subscribe( String(tasks[i].id), { qos: 0 });
               console.log("Subscribing to public task: "+tasks[i].id)
             }
-            setTaskList(tasks);
+            console.log(tasks)
+            setPubTasks(tasks);
         })
         .catch(e => handleErrors(e));
   }
@@ -428,7 +462,7 @@ const getUsers = () => {
               </Col>
               <Col className="col-8">
               <Row className="vh-100 below-nav">
-                    <PublicMgr publicList={taskList} refreshPublic={refreshPublic}></PublicMgr>
+                    <PublicMgr publicList={pubTasks} refreshPublic={refreshPublic}></PublicMgr>
                   </Row>
               </Col>              
               </Row>

@@ -37,7 +37,7 @@ module.exports.deleteTask = function deleteTask(req, res, next) {
 
 
 module.exports.updateSingleTask = function updateSingleTask(req, res, next) {
-    Tasks.updateSingleTask(req.body, req.params.taskId, req.user)
+    Tasks.updateSingleTask2(req.body, req.params.taskId, req.user)
         .then(function(response) {
             utils.writeJson(res, response, 204);
         })

@@ -5,6 +5,7 @@ const db = require('../components/db');
 var constants = require('../utils/constants.js');
 const mqtt = require('../components/mqtt');
 const MQTTTaskMessage = require('../components/mqtt_task_message.js');
+const MQTTPublicTaskMessage = require('../components/mqtt_public_task_message.js');
 
 
 /**
@@ -336,6 +337,89 @@ exports.updateSingleTask = function(task, taskId, owner) {
         });
     });
 }
+
+
+exports.updateSingleTask2 = function (task, taskId, owner) {
+    return new Promise((resolve, reject) => {
+
+        const sql1 = "SELECT owner FROM tasks t WHERE t.id = ?";
+        db.all(sql1, [taskId], (err, rows) => {
+            if (err)
+                reject(err);
+            else if (rows.length === 0)
+                reject(404);
+            else if (owner != rows[0].owner) {
+                reject(403);
+            }
+            else {
+                const sql21 = "SELECT * FROM tasks t WHERE t.id = ?"
+                db.get(sql21, [taskId], (err, row) => {
+                    // process the row here 
+                    if(err)
+                        reject(err)
+                    else{
+
+                        const sql2 = 'DELETE FROM assignments WHERE task = ?';
+                        db.run(sql2, [taskId], (err) => {
+                            if (err)
+                                reject(err);
+                            else {
+                                var sql3 = 'UPDATE tasks SET description = ?';
+                                var parameters = [task.description];
+                                if (task.important != undefined) {
+                                    sql3 = sql3.concat(', important = ?');
+                                    parameters.push(task.important);
+                                }
+                                if (task.private != undefined) {
+                                    sql3 = sql3.concat(', private = ?');
+                                    parameters.push(task.private);
+                                }
+                                if (task.project != undefined) {
+                                    sql3 = sql3.concat(', project = ?');
+                                    parameters.push(task.project);
+                                }
+                                if (task.deadline != undefined) {
+                                    sql3 = sql3.concat(', deadline = ?');
+                                    parameters.push(task.deadline);
+                                }
+                                sql3 = sql3.concat(' WHERE id = ?');
+                                parameters.push(task.id);
+    
+                                db.run(sql3, parameters, function (err) {
+                                    if (err) {
+                                        reject(err);
+                                    } else {
+                                        resolve(null);
+                                        if(row.private == 0 && task.private == false){
+                                            // vecchio task pubblico, nuovo task pubblico
+                                            // pubblico il nuovo task nel suo topic
+                                        }else if(row.private != 0 && task.private != false) {
+                                            // vecchio task privato e nuovo task privato
+                                            // pubblico il nuovo task nel suo topic
+                                        }else if(row.private != 0 && task.private == false){
+                                            // vecchio task privato, nuovo task pubblico
+                                            // pubblico il nuovo task nel topic PublicTasks
+                                            var message = new MQTTPublicTaskMessage("updateA", taskId, task);
+                                            mqtt.publishPublicTaskMessage(message);
+                                        }else{
+                                            // vecchio task pubblico e nuovo task privato
+                                            // pubblico il nuovo task nel suo topic
+                                            console.log("QUIIXXXXXXXXXXXXX")
+                                            var message = new MQTTTaskMessage("remove", null, null);
+                                            mqtt.publishTaskMessage(taskId, message);
+                                        }
+                                    }
+    
+                                })
+                            }
+                        })
+                    }
+                });
+            }
+        });
+    });
+}
+
 
 
 /**
