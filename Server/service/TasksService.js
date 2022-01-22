@@ -25,7 +25,7 @@ exports.addTask = function(task, owner) {
                 reject(err);
             } else {
                 //Creation of a new MQTT message for the created task
-                var message = new MQTTTaskMessage("inactive", null, null);
+                var message = new MQTTTaskMessage("inactive", null, null, null);
                 mqtt.saveMessage(this.lastID, message);
                 mqtt.publishTaskMessage(this.lastID, message);
 
@@ -69,7 +69,7 @@ exports.deleteTask = function(taskId, owner) {
                                 reject(err);
                             else{
                                 //Delete the corresponding MQTT message
-                                mqtt.publishTaskMessage(taskId, new MQTTTaskMessage("deleted", null, null));
+                                mqtt.publishTaskMessage(taskId, new MQTTTaskMessage("deleted", null, null, null));
                                 //mqtt.publishTaskMessage(taskId, null); //uncomment if we want to clear the last retained message
                                 mqtt.deleteMessage(taskId);
                                 resolve(null);
@@ -393,19 +393,21 @@ exports.updateSingleTask2 = function (task, taskId, owner) {
                                         if(row.private == 0 && task.private == false){
                                             // vecchio task pubblico, nuovo task pubblico
                                             // pubblico il nuovo task nel suo topic
+                                            var message = new MQTTPublicTaskMessage("update", taskId, task);
+                                            mqtt.publishTaskMessage(taskId, message, true);
                                         }else if(row.private != 0 && task.private != false) {
                                             // vecchio task privato e nuovo task privato
                                             // pubblico il nuovo task nel suo topic
                                         }else if(row.private != 0 && task.private == false){
                                             // vecchio task privato, nuovo task pubblico
                                             // pubblico il nuovo task nel topic PublicTasks
-                                            var message = new MQTTPublicTaskMessage("updateA", taskId, task);
+                                            var message = new MQTTPublicTaskMessage("newPubTask", taskId, task);
                                             mqtt.publishPublicTaskMessage(message);
                                         }else{
                                             // vecchio task pubblico e nuovo task privato
                                             // pubblico il nuovo task nel suo topic
                                             console.log("QUIIXXXXXXXXXXXXX")
-                                            var message = new MQTTTaskMessage("remove", null, null);
+                                            var message = new MQTTTaskMessage("remove", null, null, true);
                                             mqtt.publishTaskMessage(taskId, message);
                                         }
                                     }

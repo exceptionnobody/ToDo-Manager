@@ -32,9 +32,11 @@ const Assignments = (props) => {
 
   const handleUsersDropdown = (e, { value }) => {
     userId = value;
+    console.log("VALUE USER", value)
   }
 
   const handleTasksDropdown = (e, { value }) => {
+    console.log("TASK USER", value)
     tasksArray =(value);
   }
   

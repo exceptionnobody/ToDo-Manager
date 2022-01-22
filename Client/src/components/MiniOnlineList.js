@@ -1,7 +1,6 @@
 import React from 'react';
 import ListGroup from 'react-bootstrap/ListGroup';
-import Image from 'react-bootstrap/Image';
-import {PersonBoundingBox} from  'react-bootstrap-icons';
+
 
 const MiniOnlineList = (props) => {
     const {onlineList} = props;

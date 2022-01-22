@@ -49,9 +49,13 @@ mqtt_connection.on('close', function () {
   console.log(clientId + ' disconnected');
 })
 
-module.exports.publishTaskMessage = function publishTaskMessage(taskId, message) {
+module.exports.publishTaskMessage = function publishTaskMessage(taskId, message, retain) {
   //settare retain = true
-    mqtt_connection.publish(String(taskId), JSON.stringify(message), { qos: 0, retain:false})
+    if(retain)
+      mqtt_connection.publish(String(taskId), JSON.stringify(message), { qos: 0, retain:false})
+    else
+      mqtt_connection.publish(String(taskId), JSON.stringify(message), { qos: 0, retain:true})
+
 };
 
 module.exports.publishPublicTaskMessage = function publishPublicTaskMessage(message) {

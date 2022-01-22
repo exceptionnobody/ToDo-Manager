@@ -188,8 +188,10 @@ async function logIn(credentials) {
 
 async function logOut() {
   await fetch('/api/users/authenticator?type=logout', { method: 'POST',headers: {'Content-Type': 'application/json',},
-          body: JSON.stringify({ email: localStorage.getItem('email'), password:  localStorage.getItem('password') }), });
+          body: JSON.stringify({ email: localStorage.getItem('email')}), });
 }
+//Originale: body: JSON.stringify({ email: localStorage.getItem('email'), password:  localStorage.getItem('password') }), });
+
 
 async function getUserInfo() {
   //const response = await fetch(BASEURL + '/sessions/current');
@@ -229,7 +231,7 @@ async function assignTask(userId,taskId) {
           headers: {
               'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ id: userId, email:localStorage.getItem("email"), name:localStorage.getItem("name")}),
+          body: JSON.stringify({ id: userId, email: localStorage.getItem("email"), name: localStorage.getItem("username")}),
       }).then((response) => {
           if (response.ok) {
              resolve(null)

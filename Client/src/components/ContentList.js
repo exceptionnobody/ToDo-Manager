@@ -25,7 +25,7 @@ const formatDeadline = (d) => {
 }
 
 const TaskRowData = (props) => {
-  const { task, onCheck, filter, handler, assignedTaskList } = props;
+  const { task, onCheck, filter, assignedTaskList } = props;
   const labelClassName = `${task.important ? 'important' : ''} ${task.completed ? 'completed' : ''}`;
   var assignedUser = "";
 
@@ -57,7 +57,7 @@ const TaskRowData = (props) => {
         : null
       }
       <div className="flex-fill mx-2 m-auto"><PersonSquare className={task.private ? 'invisible' : ''} /></div>
-      <div className="flex-fill m-auto"><small>{formatDeadline(task.deadline)}</small></div>
+      <div className="flex-fill m-auto"><small>{formatDeadline(dayjs(task.deadline))}</small></div>
     </>
   )
 }

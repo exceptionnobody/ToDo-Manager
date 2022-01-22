@@ -23,7 +23,7 @@ import { Route, useRouteMatch, useHistory, Switch, Redirect } from 'react-router
 
 import dayjs from 'dayjs';
 import isToday from 'dayjs/plugin/isToday';
-import { Newspaper } from 'react-bootstrap-icons';
+
 dayjs.extend(isToday);
 
 const EventEmitter = require('events');
@@ -119,10 +119,13 @@ const Main = () => {
             displayTaskSelection(topic, parsedMessage);
           
           if(parsedMessage.status == "remove")
-              updateB(topic)                   
+              updateB(topic)
+          
+          if(parsedMessage.status == "update")
+              updateC(topic, parsedMessage)                   
            
        }else{
-          if(parsedMessage.status == "updateA")
+          if(parsedMessage.status == "newPubTask")
             updateA(parsedMessage)  
                          
 
@@ -184,7 +187,7 @@ const Main = () => {
 
   function updateA(message){
     client.subscribe(String(message.id, {qos:0}))
-    console.log("Parsed Message UpdateA")
+    console.log("Parsed Message newPubTask")
     console.log(message)
     setPubTasks(state => {return [...state, message.task]})
 
@@ -198,13 +201,43 @@ const Main = () => {
              
   }
 
+  function updateC(topic, message) {
+    console.log("Parsed Message update")
+    
+    console.log("topic: ", topic)
+    console.log(message)
+    setPubTasks(oldstate => {
+      let newState = oldstate.map((item) => {
+
+        if (item.id == parseInt(topic))
+          return {...message.task}
+        else
+          return item
+      })
+      return newState
+    })
+
+  }
+
   const displayTaskSelection = (topic, parsedMessage) => {
     handler.emit(topic,parsedMessage);
 
     var index = assignedTaskList.findIndex(x => x.taskId == topic);
     let objectStatus = { taskId: topic, userName: parsedMessage.userName, status: parsedMessage.status };
-    index === -1 ? assignedTaskList.push(objectStatus) : assignedTaskList[index] = objectStatus;
+    index === -1 ? setAssignedTaskList(oldState => {return [...oldState, objectStatus]}) : setAssignedTaskList(oldState => {
+      
+        let newState = oldState.map((item, j) => {
+  
+          if (j == index)
+            return objectStatus
+          else
+            return item
+        })
+        return newState
+      
 
+    })
+    
     setDirty(true);
   }
 
@@ -224,7 +257,7 @@ const Main = () => {
       }
     }
     if (datas.typeMessage == "logout") {
-      for (var i = 0; i < onlineList.length; i++) {
+      for (let i = 0; i < onlineList.length; i++) {
         if (onlineList[i].userId == datas.userId) {
           onlineList.splice(i, 1);
         }
@@ -233,7 +266,7 @@ const Main = () => {
     }
     if (datas.typeMessage == "update") {
       let flag = 0;
-      for (var i = 0; i < onlineList.length; i++) {
+      for (let i = 0; i < onlineList.length; i++) {
         if (onlineList[i].userId == datas.userId) {
           flag = 1;
           onlineList[i] = datas;
@@ -378,7 +411,7 @@ const getUsers = () => {
 
     // if the task has an id it is an update
     if (task.id) {
-      const response = API.updateTask(task)
+      API.updateTask(task)
       .then(response => {
         if(response.ok){
           API.getTasks(activeFilter, localStorage.getItem('currentPage'))
@@ -421,17 +454,17 @@ const getUsers = () => {
   }
 
   const handleLogOut = async () => {
-    await API.logOut()
     // clean up everything
     setLoggedIn(false);
     setUser(null);
     setTaskList([]);
     setDirty(true);
+    setPubTasks([]);
+    client.unsubscribe("PublicTasks")
+    await API.logOut()
     localStorage.removeItem('userId');
     localStorage.removeItem('email');
     localStorage.removeItem('username');
-    
-    client.unsubscribe("PublicTasks")
   }
 
  
