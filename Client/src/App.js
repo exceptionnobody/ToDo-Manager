@@ -122,13 +122,14 @@ const Main = () => {
               updateB(topic)
           
           if(parsedMessage.status == "update")
-              updateC(topic, parsedMessage)                   
-           
+              updateC(topic, parsedMessage)
+          if(parsedMessage.status == "deletePubTask")                   
+              updateB(topic)
        }else{
           if(parsedMessage.status == "newPubTask")
             updateA(parsedMessage)  
-                         
-
+          if(parsedMessage.status == "createdPubTask")              
+            updateA(parsedMessage)
         }
       } catch(e) {
           console.log(e);
@@ -187,14 +188,14 @@ const Main = () => {
 
   function updateA(message){
     client.subscribe(String(message.id, {qos:0}))
-    console.log("Parsed Message newPubTask")
+    console.log("Parsed Message newPubTask/createdPubTask")
     console.log(message)
     setPubTasks(state => {return [...state, message.task]})
 
   }
 
   function updateB(topic){
-    console.log("Parsed Message remove")
+    console.log("Parsed Message remove/deletePubTask")
     client.unsubscribe(topic)
     console.log("topic: ", topic)
     setPubTasks(oldstate => { return oldstate.filter((item)=>item.id !== parseInt(topic))  })
