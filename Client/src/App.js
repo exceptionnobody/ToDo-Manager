@@ -91,44 +91,44 @@ const Main = () => {
     history.push("/list/" + filter);
   }
 
-  
+
   useEffect(() => {
 
 
     //MQTT management
-           
+
     client.on('error', function (err) {
       console.log(err)
       client.end()
     })
-    
+
     client.on('connect', function () {
       console.log('client connected:' + clientId)
     })
 
 
-    client.on('message', function(topic,messageBroker) {
+    client.on('message', function (topic, messageBroker) {
       try {
         var parsedMessage = JSON.parse(messageBroker);
 
-        if(topic != "PublicTasks"){
-          if(parsedMessage.status == "deleted") 
-              client.unsubscribe(topic);
-          if(parsedMessage.status == "active" || parsedMessage.status == "inactive")
+        if (topic != "PublicTasks") {
+          if (parsedMessage.status == "deleted")
+            client.unsubscribe(topic);
+          if (parsedMessage.status == "active" || parsedMessage.status == "inactive")
             displayTaskSelection(topic, parsedMessage);
-          
-          if(parsedMessage.status == "remove" || parsedMessage.status == "deletePubTask")
-              updateB(topic)
-          
-          if(parsedMessage.status == "update")
-              updateC(topic, parsedMessage)
 
-       }else{
-          if(parsedMessage.status == "newPubTask" || parsedMessage.status == "createdPubTask")
-            updateA(parsedMessage)  
+          if (parsedMessage.status == "remove" || parsedMessage.status == "deletePubTask")
+            updateB(topic)
+
+          if (parsedMessage.status == "update")
+            updateC(topic, parsedMessage)
+
+        } else {
+          if (parsedMessage.status == "newPubTask" || parsedMessage.status == "createdPubTask")
+            updateA(parsedMessage)
         }
-      } catch(e) {
-          console.log(e);
+      } catch (e) {
+        console.log(e);
       }
     })
 
@@ -142,18 +142,18 @@ const Main = () => {
       ws.send('Message From Client');
       setOnlineList([]);
     }
-    
+
     ws.onerror = (error) => {
       console.log(`WebSocket error: ${error}`);
     }
-    
+
     ws.onmessage = (e) => {
       try {
         messageReceived(e);
       } catch (error) {
         console.log(error);
       }
-      
+
     }
 
     // check if user is authenticated
@@ -161,13 +161,13 @@ const Main = () => {
       try {
         // here you have the user info, if already logged in
         const authenticated = await API.getUserInfo();
-        if(authenticated){
+        if (authenticated) {
           //setUser();
           setLoggedIn(true);
         } else {
           console.log('error');
         }
-        
+
       } catch (err) {
         console.log(err.error); // mostly unauthenticated user
       }
@@ -182,27 +182,27 @@ const Main = () => {
   }, [activeFilter])
 
 
-  function updateA(messageBroker){
-    client.subscribe(String(messageBroker.id, {qos:0}))
+  function updateA(messageBroker) {
+    client.subscribe(String(messageBroker.id, { qos: 0 }))
     console.log("Parsed Message newPubTask/createdPubTask")
     console.log(message)
     PublicMap.set(messageBroker.id, messageBroker.task)
-    setPubTasks(state => {return [...state, messageBroker.task]})
+    setPubTasks(state => { return [...state, messageBroker.task] })
 
   }
 
-  function updateB(topic){
+  function updateB(topic) {
     console.log("Parsed Message remove/deletePubTask")
     client.unsubscribe(topic)
     console.log("topic: ", topic)
     PublicMap.delete(parseInt(topic))
-    setPubTasks(oldstate => { return oldstate.filter((item)=>item.id !== parseInt(topic))  })
-             
+    setPubTasks(oldstate => { return oldstate.filter((item) => item.id !== parseInt(topic)) })
+
   }
 
   function updateC(topic, messageBroker) {
     console.log("Parsed Message update")
-    
+
     console.log("topic: ", topic)
     console.log(message)
     PublicMap.set(parseInt(topic), messageBroker.task)
@@ -210,7 +210,7 @@ const Main = () => {
       let newState = oldstate.map((item) => {
 
         if (item.id == parseInt(topic))
-          return {...messageBroker.task}
+          return { ...messageBroker.task }
         else
           return item
       })
@@ -220,24 +220,24 @@ const Main = () => {
   }
 
   const displayTaskSelection = (topic, parsedMessage) => {
-    handler.emit(topic,parsedMessage);
+    handler.emit(topic, parsedMessage);
 
     var index = assignedTaskList.findIndex(x => x.taskId == topic);
     let objectStatus = { taskId: topic, userName: parsedMessage.userName, status: parsedMessage.status };
-    index === -1 ? setAssignedTaskList(oldState => {return [...oldState, objectStatus]}) : setAssignedTaskList(oldState => {
-      
-        let newState = oldState.map((item, j) => {
-  
-          if (j == index)
-            return objectStatus
-          else
-            return item
-        })
-        return newState
-      
+    index === -1 ? setAssignedTaskList(oldState => { return [...oldState, objectStatus] }) : setAssignedTaskList(oldState => {
+
+      let newState = oldState.map((item, j) => {
+
+        if (j == index)
+          return objectStatus
+        else
+          return item
+      })
+      return newState
+
 
     })
-    
+
     setDirty(true);
   }
 
@@ -291,7 +291,7 @@ const Main = () => {
 
   const completeTask = (task) => {
     API.completeTask(task)
-      .then(() => {setDirty(true)})
+      .then(() => { setDirty(true) })
       .catch(e => handleErrors(e))
   }
 
@@ -305,9 +305,9 @@ const Main = () => {
       API.getTasks('owned')
         .then(tasks => {
           for (let i = 0; i < tasks.length; i++) {
-            client.subscribe( String(tasks[i].id), { qos: 0 ,retain:true});
-            console.log("Subscribing to "+tasks[i].id)
-         }  
+            client.subscribe(String(tasks[i].id), { qos: 0, retain: true });
+            console.log("Subscribing to " + tasks[i].id)
+          }
           setTaskList(tasks);
         })
         .catch(e => handleErrors(e));
@@ -315,19 +315,19 @@ const Main = () => {
   }
 
   const getPublicTasks = () => {
-      API.getPublicTasks()
-        .then(tasks => {
-            for (const element of tasks) {
-              if(!PublicMap.has(element.id)){
-                client.subscribe( String(element.id), { qos: 0 });
-                console.log("Subscribing to public task: "+element.id)
-                PublicMap.set(element.id, element)
-            }
+    API.getPublicTasks()
+      .then(tasks => {
+        for (const element of tasks) {
+          if (!PublicMap.has(element.id)) {
+            client.subscribe(String(element.id), { qos: 0 });
+            console.log("Subscribing to public task: " + element.id)
+            PublicMap.set(element.id, element)
           }
-            console.log(tasks)
-            setPubTasks(tasks);
-        })
-        .catch(e => handleErrors(e));
+        }
+        console.log(tasks)
+        setPubTasks(tasks);
+      })
+      .catch(e => handleErrors(e));
   }
 
   const getAllOwnedTasks = () => {
@@ -336,54 +336,62 @@ const Main = () => {
         setOwnedTaskList(tasks);
       })
       .catch(e => handleErrors(e));
-}
+  }
 
-const getUsers = () => {
-  API.getUsers()
-    .then(users => {
-      setUserList(users);
-    })
-    .catch(e => handleErrors(e));
-}
+  const getUsers = () => {
+    API.getUsers()
+      .then(users => {
+        setUserList(users);
+      })
+      .catch(e => handleErrors(e));
+  }
 
   const refreshTasks = (filter, page) => {
     API.getTasks(filter, page)
-    .then(tasks => {
-      for (let i = 0; i < tasks.length; i++) {
-        client.subscribe( String(tasks[i].id), { qos: 0 ,retain:true});
-        console.log("Subscribing to "+tasks[i].id)
-     }  
-      setTaskList(tasks);
-      setDirty(false);
-    })
-    .catch(e => handleErrors(e));
+      .then(tasks => {
+        for (let i = 0; i < tasks.length; i++) {
+          client.subscribe(String(tasks[i].id), { qos: 0, retain: true });
+          console.log("Subscribing to " + tasks[i].id)
+        }
+        setTaskList(tasks);
+        setDirty(false);
+      })
+      .catch(e => handleErrors(e));
   }
 
   const refreshPublic = (page) => {
     API.getPublicTasks(page)
-    .then(tasks => {
-      setTaskList(tasks);
-      setDirty(false);
-    })
-    .catch(e => handleErrors(e));
+      .then(tasks => {
+        for (const element of tasks) {
+          if (!PublicMap.has(element.id)) {
+            client.subscribe(String(element.id), { qos: 0 });
+            console.log("Subscribing to public task: " + element.id)
+            PublicMap.set(element.id, element)
+          }
+        }
+        console.log("Refreshing public tasks",tasks)
+        setPubTasks(tasks);
+        setDirty(false);
+      })
+      .catch(e => handleErrors(e));
   }
 
-  const assignTask = (userId,tasksId) => {
+  const assignTask = (userId, tasksId) => {
     for (let i = 0; i < tasksId.length; i++) {
-      API.assignTask(Number(userId),tasksId[i]).catch(e => handleErrors(e));
+      API.assignTask(Number(userId), tasksId[i]).catch(e => handleErrors(e));
     }
   }
 
-  const removeAssignTask = (userId,tasksId) => {
+  const removeAssignTask = (userId, tasksId) => {
     for (let i = 0; i < tasksId.length; i++) {
-      API.removeAssignTask(Number(userId),tasksId[i]).catch(e => handleErrors(e));
+      API.removeAssignTask(Number(userId), tasksId[i]).catch(e => handleErrors(e));
     }
   }
 
   const selectTask = (task) => {
     API.selectTask(task)
       .then(() => setDirty(true))
-      .catch(e => {alert('Task is already active for another user!'); handleErrors(e);})
+      .catch(e => { alert('Task is already active for another user!'); handleErrors(e); })
   }
 
 
@@ -392,14 +400,14 @@ const getUsers = () => {
       API.getTasks(activeFilter, localStorage.getItem('currentPage'))
         .then(tasks => {
           for (let i = 0; i < tasks.length; i++) {
-            client.subscribe( String(tasks[i].id), { qos: 0 ,retain:true});
-            console.log("Subscribing to "+tasks[i].id)
-          }  
+            client.subscribe(String(tasks[i].id), { qos: 0, retain: true });
+            console.log("Subscribing to " + tasks[i].id)
+          }
           setTaskList(tasks);
           setDirty(false);
         })
         .catch(e => handleErrors(e));
-    } 
+    }
   }, [activeFilter, dirty, loggedIn, user])
 
   // show error message in toast
@@ -415,16 +423,16 @@ const getUsers = () => {
     // if the task has an id it is an update
     if (task.id) {
       API.updateTask(task)
-      .then(response => {
-        if(response.ok){
-          API.getTasks(activeFilter, localStorage.getItem('currentPage'))
-          .then(tasks => {
-            setTaskList(tasks);
-          }).catch(e => handleErrors(e));
-        }
-      }).catch(e => handleErrors(e));
+        .then(response => {
+          if (response.ok) {
+            API.getTasks(activeFilter, localStorage.getItem('currentPage'))
+              .then(tasks => {
+                setTaskList(tasks);
+              }).catch(e => handleErrors(e));
+          }
+        }).catch(e => handleErrors(e));
 
-    // otherwise it is a new task to add
+      // otherwise it is a new task to add
     } else {
       API.addTask(task)
         .then(() => setDirty(true))
@@ -448,7 +456,7 @@ const getUsers = () => {
       setUser(LoggedUser);
       setLoggedIn(true);
       console.log("Public Task Topic.")
-      client.subscribe("PublicTasks", {qos:0})
+      client.subscribe("PublicTasks", { qos: 0 })
     }
     catch (err) {
       // error is handled and visualized in the login form, do not manage error, throw it
@@ -470,12 +478,12 @@ const getUsers = () => {
     localStorage.removeItem('username');
   }
 
- 
+
   return (
 
     <Container fluid>
       <Row>
-        <Navigation onLogOut={handleLogOut} loggedIn={loggedIn}  user={user} getPublicTasks={getPublicTasks} getInitialTasks={getInitialTasks}/>
+        <Navigation onLogOut={handleLogOut} loggedIn={loggedIn} user={user} getPublicTasks={getPublicTasks} getInitialTasks={getInitialTasks} />
       </Row>
 
       <Toast show={message !== ''} onClose={() => setMessage('')} delay={3000} autohide>
@@ -485,53 +493,53 @@ const getUsers = () => {
       <Switch>
         <Route path="/login">
           <Row className="vh-100 below-nav">
-            {loggedIn ?  <Redirect to="/" />  : <LoginForm login={doLogIn} />}
+            {loggedIn ? <Redirect to="/" /> : <LoginForm login={doLogIn} />}
           </Row>
         </Route>
 
-        
+
         <Route path="/public">
-              <Row className="vheight-100">
-              <Col sm={3} bg="light" className="d-block col-4" id="left-sidebar">
-                    <span>&nbsp;&nbsp;</span>
-                    <MiniOnlineList onlineList={onlineList}/>
-              </Col>
-              <Col className="col-8">
-              <Row className="vh-100 below-nav">
-                    <PublicMgr publicList={pubTasks} refreshPublic={refreshPublic}></PublicMgr>
-                  </Row>
-              </Col>              
-              </Row>
-          </Route>
-
-          <Route path="/online">
-              <Row className="vheight-100"> 
-              <Col sm={3} bg="light" className="d-block col-4" id="left-sidebar">
-                    <span>&nbsp;&nbsp;</span>
-                    <MiniOnlineList onlineList={onlineList}/>
-              </Col>
-                <Col sm={8} className="below-nav"> 
-                  <h5><strong>Online Users</strong></h5>
-                    <div className="user">
-                        <OnlineList  usersList={onlineList} ws={ws} />
-                   </div>  
-                </Col>
-              </Row>
-            </Route>
-
-          <Route path="/assignment">
-          {loggedIn ?
           <Row className="vheight-100">
+            <Col sm={3} bg="light" className="d-block col-4" id="left-sidebar">
+              <span>&nbsp;&nbsp;</span>
+              <MiniOnlineList onlineList={onlineList} />
+            </Col>
+            <Col className="col-8">
+              <Row className="vh-100 below-nav">
+                <PublicMgr publicList={pubTasks} refreshPublic={refreshPublic}></PublicMgr>
+              </Row>
+            </Col>
+          </Row>
+        </Route>
+
+        <Route path="/online">
+          <Row className="vheight-100">
+            <Col sm={3} bg="light" className="d-block col-4" id="left-sidebar">
+              <span>&nbsp;&nbsp;</span>
+              <MiniOnlineList onlineList={onlineList} />
+            </Col>
+            <Col sm={8} className="below-nav">
+              <h5><strong>Online Users</strong></h5>
+              <div className="user">
+                <OnlineList usersList={onlineList} ws={ws} />
+              </div>
+            </Col>
+          </Row>
+        </Route>
+
+        <Route path="/assignment">
+          {loggedIn ?
+            <Row className="vheight-100">
               <Col sm={3} bg="light" className="d-block col-4" id="left-sidebar">
-                    <span>&nbsp;&nbsp;</span>
-                    <MiniOnlineList onlineList={onlineList}/>
+                <span>&nbsp;&nbsp;</span>
+                <MiniOnlineList onlineList={onlineList} />
               </Col>
               <Col sm={8} bg="light" id="left-sidebar" className="collapse d-sm-block below-nav">
-                        <Assignments OwnedTaskList = {OwnedTaskList} getAllOwnedTasks = {getAllOwnedTasks} UserList = {userList} getUsers = {getUsers} assignTask = {assignTask} removeAssignTask = {removeAssignTask} />
-              </Col>         
-              </Row>
-         : <Redirect to="/login" />
-        } </Route> 
+                <Assignments OwnedTaskList={OwnedTaskList} getAllOwnedTasks={getAllOwnedTasks} UserList={userList} getUsers={getUsers} assignTask={assignTask} removeAssignTask={removeAssignTask} />
+              </Col>
+            </Row>
+            : <Redirect to="/login" />
+          } </Route>
 
         <Route path={["/list/:filter"]}>
           {loggedIn ?
@@ -560,8 +568,8 @@ const TaskMgr = (props) => {
 
   // ** FILTER DEFINITIONS **
   const filters = {
-    'owned': { label: 'Owned Tasks', id: 'owned'},
-    'assigned': { label: 'Assigned Tasks', id: 'assigned'}
+    'owned': { label: 'Owned Tasks', id: 'owned' },
+    'assigned': { label: 'Assigned Tasks', id: 'assigned' }
   };
 
   // if filter is not know apply "all"
@@ -569,14 +577,14 @@ const TaskMgr = (props) => {
 
   return (
     <>
-        <Col sm={3} bg="light" className="d-block col-4" id="left-sidebar">
-          <Filters items={filters} defaultActiveKey={activeFilter} onSelect={onSelect} />
-          <MiniOnlineList onlineList={onlineList}/>
-        </Col>
+      <Col sm={3} bg="light" className="d-block col-4" id="left-sidebar">
+        <Filters items={filters} defaultActiveKey={activeFilter} onSelect={onSelect} />
+        <MiniOnlineList onlineList={onlineList} />
+      </Col>
       <Col className="col-8">
         <h1 className="pb-3">Filter: <small className="text-muted">{activeFilter}</small></h1>
         <ContentList
-          tasks={ taskList}
+          tasks={taskList}
           onDelete={onDelete} onEdit={onEdit} onCheck={onCheck} onComplete={onComplete} filter={activeFilter} getTasks={refreshTasks}
           handler={handler} assignedTaskList={assignedTaskList}
         />
@@ -597,7 +605,7 @@ const PublicMgr = (props) => {
       <Col className="col-8">
         <h1 className="pb-3">Public Tasks</h1>
         <PublicList
-          tasks={ publicList} getTasks={refreshPublic}
+          tasks={publicList} getTasks={refreshPublic}
         />
       </Col>
     </>
