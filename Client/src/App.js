@@ -49,7 +49,7 @@ var options = {
 }
 var host = 'ws://127.0.0.1:8080'
 var client = mqtt.connect(host, options);
-
+var PublicMap = new Map()
 
 const App = () => {
 
@@ -117,18 +117,15 @@ const Main = () => {
           if(parsedMessage.status == "active" || parsedMessage.status == "inactive")
             displayTaskSelection(topic, parsedMessage);
           
-          if(parsedMessage.status == "remove")
+          if(parsedMessage.status == "remove" || parsedMessage.status == "deletePubTask")
               updateB(topic)
           
           if(parsedMessage.status == "update")
               updateC(topic, parsedMessage)
-          if(parsedMessage.status == "deletePubTask")                   
-              updateB(topic)
+
        }else{
-          if(parsedMessage.status == "newPubTask")
+          if(parsedMessage.status == "newPubTask" || parsedMessage.status == "createdPubTask")
             updateA(parsedMessage)  
-          if(parsedMessage.status == "createdPubTask")              
-            updateA(parsedMessage)
         }
       } catch(e) {
           console.log(e);
@@ -189,6 +186,7 @@ const Main = () => {
     client.subscribe(String(messageBroker.id, {qos:0}))
     console.log("Parsed Message newPubTask/createdPubTask")
     console.log(message)
+    PublicMap.set(messageBroker.id, messageBroker.task)
     setPubTasks(state => {return [...state, messageBroker.task]})
 
   }
@@ -197,6 +195,7 @@ const Main = () => {
     console.log("Parsed Message remove/deletePubTask")
     client.unsubscribe(topic)
     console.log("topic: ", topic)
+    PublicMap.delete(parseInt(topic))
     setPubTasks(oldstate => { return oldstate.filter((item)=>item.id !== parseInt(topic))  })
              
   }
@@ -206,6 +205,7 @@ const Main = () => {
     
     console.log("topic: ", topic)
     console.log(message)
+    PublicMap.set(parseInt(topic), messageBroker.task)
     setPubTasks(oldstate => {
       let newState = oldstate.map((item) => {
 
@@ -317,10 +317,13 @@ const Main = () => {
   const getPublicTasks = () => {
       API.getPublicTasks()
         .then(tasks => {
-            for (let i = 0; i < tasks.length; i++) {
-              client.subscribe( String(tasks[i].id), { qos: 0 });
-              console.log("Subscribing to public task: "+tasks[i].id)
+            for (const element of tasks) {
+              if(!PublicMap.has(element.id)){
+                client.subscribe( String(element.id), { qos: 0 });
+                console.log("Subscribing to public task: "+element.id)
+                PublicMap.set(element.id, element)
             }
+          }
             console.log(tasks)
             setPubTasks(tasks);
         })
