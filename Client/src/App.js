@@ -1,5 +1,4 @@
 import { React, useState, useEffect } from 'react';
-import { BrowserRouter as Router } from 'react-router-dom';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
@@ -18,7 +17,7 @@ import Assignments from './components/Assignments';
 import OnlineList from './components/OnlineList';
 import MiniOnlineList from './components/MiniOnlineList';
 
-import { Route, useRouteMatch, useHistory, Switch, Redirect } from 'react-router-dom';
+import { Route, useRouteMatch, useHistory, Switch, Redirect, BrowserRouter as Router } from 'react-router-dom';
 
 
 import dayjs from 'dayjs';
@@ -108,9 +107,9 @@ const Main = () => {
     })
 
 
-    client.on('message', function(topic,message) {
+    client.on('message', function(topic,messageBroker) {
       try {
-        var parsedMessage = JSON.parse(message);
+        var parsedMessage = JSON.parse(messageBroker);
 
         if(topic != "PublicTasks"){
           if(parsedMessage.status == "deleted") 
@@ -186,11 +185,11 @@ const Main = () => {
   }, [activeFilter])
 
 
-  function updateA(message){
-    client.subscribe(String(message.id, {qos:0}))
+  function updateA(messageBroker){
+    client.subscribe(String(messageBroker.id, {qos:0}))
     console.log("Parsed Message newPubTask/createdPubTask")
     console.log(message)
-    setPubTasks(state => {return [...state, message.task]})
+    setPubTasks(state => {return [...state, messageBroker.task]})
 
   }
 
@@ -202,7 +201,7 @@ const Main = () => {
              
   }
 
-  function updateC(topic, message) {
+  function updateC(topic, messageBroker) {
     console.log("Parsed Message update")
     
     console.log("topic: ", topic)
@@ -211,7 +210,7 @@ const Main = () => {
       let newState = oldstate.map((item) => {
 
         if (item.id == parseInt(topic))
-          return {...message.task}
+          return {...messageBroker.task}
         else
           return item
       })
@@ -247,7 +246,7 @@ const Main = () => {
     let datas = JSON.parse(e.data.toString());
     if (datas.typeMessage == "login") {
       let flag = 0;
-      for (var i = 0; i < onlineList.length; i++) {
+      for (let i = 0; i < onlineList.length; i++) {
         if (onlineList[i].userId == datas.userId) {
           flag = 1;
         }
@@ -305,7 +304,7 @@ const Main = () => {
     if (loggedIn) {
       API.getTasks('owned')
         .then(tasks => {
-          for (var i = 0; i < tasks.length; i++) {
+          for (let i = 0; i < tasks.length; i++) {
             client.subscribe( String(tasks[i].id), { qos: 0 ,retain:true});
             console.log("Subscribing to "+tasks[i].id)
          }  
@@ -318,7 +317,7 @@ const Main = () => {
   const getPublicTasks = () => {
       API.getPublicTasks()
         .then(tasks => {
-            for (var i = 0; i < tasks.length; i++) {
+            for (let i = 0; i < tasks.length; i++) {
               client.subscribe( String(tasks[i].id), { qos: 0 });
               console.log("Subscribing to public task: "+tasks[i].id)
             }
@@ -347,7 +346,7 @@ const getUsers = () => {
   const refreshTasks = (filter, page) => {
     API.getTasks(filter, page)
     .then(tasks => {
-      for (var i = 0; i < tasks.length; i++) {
+      for (let i = 0; i < tasks.length; i++) {
         client.subscribe( String(tasks[i].id), { qos: 0 ,retain:true});
         console.log("Subscribing to "+tasks[i].id)
      }  
@@ -367,14 +366,14 @@ const getUsers = () => {
   }
 
   const assignTask = (userId,tasksId) => {
-    for (var i = 0; i < tasksId.length; i++) {
-      API.assignTask(Number(userId),tasksId[i]).catch(e => handleErrors(e));;
+    for (let i = 0; i < tasksId.length; i++) {
+      API.assignTask(Number(userId),tasksId[i]).catch(e => handleErrors(e));
     }
   }
 
   const removeAssignTask = (userId,tasksId) => {
-    for (var i = 0; i < tasksId.length; i++) {
-      API.removeAssignTask(Number(userId),tasksId[i]).catch(e => handleErrors(e));;
+    for (let i = 0; i < tasksId.length; i++) {
+      API.removeAssignTask(Number(userId),tasksId[i]).catch(e => handleErrors(e));
     }
   }
 
@@ -389,7 +388,7 @@ const getUsers = () => {
     if (loggedIn && dirty) {
       API.getTasks(activeFilter, localStorage.getItem('currentPage'))
         .then(tasks => {
-          for (var i = 0; i < tasks.length; i++) {
+          for (let i = 0; i < tasks.length; i++) {
             client.subscribe( String(tasks[i].id), { qos: 0 ,retain:true});
             console.log("Subscribing to "+tasks[i].id)
           }  
@@ -441,9 +440,9 @@ const getUsers = () => {
 
   const doLogIn = async (credentials) => {
     try {
-      const user = await API.logIn(credentials);
+      const LoggedUser = await API.logIn(credentials);
 
-      setUser(user);
+      setUser(LoggedUser);
       setLoggedIn(true);
       console.log("Public Task Topic.")
       client.subscribe("PublicTasks", {qos:0})
