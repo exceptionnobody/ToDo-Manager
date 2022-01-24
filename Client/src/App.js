@@ -241,47 +241,7 @@ const Main = () => {
     setDirty(true);
   }
 
-  const messageReceived2 = (e) => {
-    let datas = JSON.parse(e.data.toString());
-    if (datas.typeMessage == "login") {
-      let flag = 0;
-      for (let i = 0; i < onlineList.length; i++) {
-        if (onlineList[i].userId == datas.userId) {
-          flag = 1;
-        }
-      }
-      if (flag == 0) {
-        onlineList.push(datas);
-        setOnlineList(onlineList);
-      }
-    }
-    if (datas.typeMessage == "logout") {
-      for (let i = 0; i < onlineList.length; i++) {
-        if (onlineList[i].userId == datas.userId) {
-          onlineList.splice(i, 1);
-        }
-      }
-      setOnlineList(onlineList);
-    }
-    if (datas.typeMessage == "update") {
-      let flag = 0;
-      for (let i = 0; i < onlineList.length; i++) {
-        if (onlineList[i].userId == datas.userId) {
-          flag = 1;
-          onlineList[i] = datas;
-          setOnlineList(onlineList);
-        }
-      }
-
-      if (flag == 0) {
-        onlineList.push(datas);
-        setOnlineList(onlineList);
-      }
-    }
-    setDirty(true);
-  }
-
-  const messageReceived = (e) => {
+ const messageReceived = (e) => {
     let datas = JSON.parse(e.data.toString());
     if (datas.typeMessage == "login") {
 
