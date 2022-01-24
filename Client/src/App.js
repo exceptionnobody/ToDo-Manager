@@ -53,6 +53,9 @@ var client = mqtt.connect(host, options);
 var PublicMap = new Map()
 var OwnTasksMaps = new Map() 
 var temp = []
+var index;
+var TestLista = new Map()
+
 const App = () => {
 
   // Need to place <Router> above the components that use router hooks
@@ -92,7 +95,7 @@ const Main = () => {
   const handleSelectFilter = (filter) => {
     history.push("/list/" + filter);
   }
-  var TestLista = []
+
 
 
   useEffect(() => {
@@ -217,9 +220,9 @@ const Main = () => {
   function updateB(topic) {
     console.log("Parsed Message remove/deletePubTask")
     client.unsubscribe(topic)
-    console.log("topic: ", topic)
+    console.log("topic: ", topic,"PubTasks: ", pubTasks)
     PublicMap.delete(parseInt(topic))
-    setPubTasks(oldstate => { return oldstate.filter((item) => item.id !== parseInt(topic)) })
+    setPubTasks(oldstate => { return (oldstate.filter((item) => item.id !== parseInt(topic))).sort((a,b)=>parseInt(a.id)<parseInt(b.id)?-1:1) })
 
   }
 
@@ -228,24 +231,41 @@ const Main = () => {
 
     console.log("topic: ", topic)
     console.log(messageBroker)
-    PublicMap.set(parseInt(topic), messageBroker.task)
-    setPubTasks(oldstate => {
-      let newState = oldstate.map((item) => {
+    // funziona: PublicMap.set(parseInt(topic), messageBroker.task)
+    
+    if(!messageBroker.task.private){
+      PublicMap.set(topic, messageBroker.task)
+      setPubTasks(oldstate => {
+        return oldstate.map((item) => {
 
         if (item.id == parseInt(topic))
           return { ...messageBroker.task }
         else
           return item
       })
-      return newState
     })
+  }else{
+      if(topic == "updateAndRemove"){
+        client.unsubscribe(topic)
+        setTaskList(oldstate => {
 
+            return  oldstate.map((item) => {
+
+                    if (item.id == parseInt(topic))
+                       return {...messageBroker.task}
+                    else
+                       return item
+                   })
+        
+      })
+    }
   }
+}
 
   const displayTaskSelection = (topic, parsedMessage) => {
     handler.emit(topic, parsedMessage);
 
-    var index = temp.findIndex(x => x.taskId == topic);
+    index = temp.findIndex(x => x.taskId == topic);
     let objectStatus = { taskId: topic, userName: parsedMessage.userName, status: parsedMessage.status };
     console.log("Topic: ", topic, " Index: ", index, " ParsedMessage: ", parsedMessage)
     if(index === -1){
@@ -263,10 +283,42 @@ const Main = () => {
 
  const messageReceived = function(e) {
     let datas = JSON.parse(e.data.toString());
-    console.log(datas)
+    console.log("DATAS: ",datas)
     if (datas.typeMessage == "login") {
 
-      let flag = 0;
+      if(!TestLista.has(datas.userId)){
+        TestLista.set(datas["userId"], datas)
+        let test = [...TestLista.values()].sort((a, b) => {
+          let fa = a.userName.toLowerCase();
+          let fb = b.userName.toLowerCase();
+
+          if (fa < fb) {
+            return -1;
+          }
+          if (fa > fb) {
+            return 1;
+          }
+          return 0;
+        })
+        /*console.log(test.sort((a, b) => {
+          let fa = a.userName.toLowerCase();
+          let fb = b.userName.toLowerCase();
+
+          if (fa < fb) {
+            return -1;
+          }
+          if (fa > fb) {
+            return 1;
+          }
+          return 0;
+        }))*/
+        setOnlineList(test)
+      
+    }
+    }
+
+      {/*
+        let flag = 0;
       for (let i = 0; i < TestLista.length; i++) {
         if (TestLista[i].userId == datas.userId) {
           flag = 1;
@@ -276,43 +328,64 @@ const Main = () => {
         TestLista.push(datas);
         setOnlineList(TestLista);
       }
-    }
+    */}
+    
     if (datas.typeMessage == "logout") {
 
-      for (let i = 0; i < TestLista.length; i++) {
-        if (TestLista[i].userId == datas.userId) {
-          TestLista.splice(i, 1);
+      
+        if (TestLista.has(datas.userId)) {
+          TestLista.delete(datas.userId);
         }
-      }
-      setOnlineList(TestLista);
+        
+        let test = [...TestLista.values()];
+     
+        setOnlineList(test.sort((a, b) => {
+                  let fa = a.userName.toLowerCase();
+                  let fb = b.userName.toLowerCase();
+
+                  if (fa < fb) {
+                    return -1;
+                  }
+                  if (fa > fb) {
+                    return 1;
+                  }
+                  return 0;
+        }))
  
       
       }
 
       if (datas.typeMessage == "update") {
 
-          let flag = 0;
-          for (let i = 0; i < TestLista.length; i++) {
-            if (TestLista[i].userId == datas.userId) {
-              flag = 1;
-              TestLista[i] = datas;
-              setOnlineList(TestLista);
-            }
-          }
+        
+      TestLista.set(datas.userId, datas);
+      let test = [...TestLista.values()]  
+
+      setOnlineList(test.sort((a, b) => {
+        let fa = a.userName.toLowerCase();
+        let fb = b.userName.toLowerCase();
+
+        if (fa < fb) {
+          return -1;
+        }
+        if (fa > fb) {
+          return 1;
+        }
+        return 0;
+      }))
+          
+          
     
-          if (flag == 0) {
-            TestLista.push(datas);
-            setOnlineList(TestLista);
-          }
-    
-  }
+      }
       setDirty(true);
 }
 
 
   const deleteTask = (task) => {
     API.deleteTask(task)
-      .then(() => setDirty(true))
+      .then(() =>{ 
+      client.unsubscribe(String(task.id))
+      setDirty(true)})
       .catch(e => handleErrors(e))
   }
 
@@ -349,7 +422,7 @@ const Main = () => {
       .then(tasks => {
         for (const element of tasks) {
           if (!PublicMap.has(element.id)) {
-            client.subscribe(String(element.id), { qos: 0 });
+            client.subscribe(String(element.id), { qos: 0, retain: true });
             console.log("Subscribing to public task: " + element.id)
             PublicMap.set(element.id, element)
           }
@@ -413,14 +486,14 @@ const Main = () => {
   }
 
   const assignTask = (userId, tasksId) => {
-    for (let i = 0; i < tasksId.length; i++) {
-      API.assignTask(Number(userId), tasksId[i]).catch(e => handleErrors(e));
+    for (const taskId of tasksId) {
+      API.assignTask(Number(userId), taskId).catch(e => handleErrors(e));
     }
   }
 
   const removeAssignTask = (userId, tasksId) => {
-    for (let i = 0; i < tasksId.length; i++) {
-      API.removeAssignTask(Number(userId), tasksId[i]).catch(e => handleErrors(e));
+    for (const taskId of tasksId) {
+      API.removeAssignTask(Number(userId), taskId).catch(e => handleErrors(e));
     }
   }
 
@@ -474,7 +547,9 @@ const Main = () => {
       // otherwise it is a new task to add
     } else {
       API.addTask(task)
-        .then(() => setDirty(true))
+        .then(() => {
+          client.subscribe(String(task.id), {qos:0})
+          setDirty(true)})
         .catch(e => handleErrors(e));
     }
     setSelectedTask(MODAL.CLOSED);

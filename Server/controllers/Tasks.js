@@ -3,8 +3,11 @@
 var utils = require('../utils/writer.js');
 var constants = require('../utils/constants.js');
 var Tasks = require('../service/TasksService.js');
-var Assignments = require('../service/AssignmentsService.js');
-
+var numOfTasks;
+var nextPage;
+var totalPage;
+var pageNo;
+var nextLink;
 module.exports.addTask = function addTask(req, res, next) {
     var task = req.body;
     var owner = req.user;
@@ -73,8 +76,9 @@ module.exports.getSingleTask = function getSingleTask(req, res, next) {
 };
 
 module.exports.getPublicTasks = function getPublicTasks(req, res, next) {
-    var numOfTasks = 0;
-    var next=0;
+    
+    numOfTasks = 0;
+    
     Tasks.getPublicTasksTotal()
         .then(function(response) {
             numOfTasks = response;
@@ -82,10 +86,14 @@ module.exports.getPublicTasks = function getPublicTasks(req, res, next) {
 
     Tasks.getPublicTasks(req)
         .then(function(response) {
-            if (req.query.pageNo == null) var pageNo = 1;
-            else var pageNo = req.query.pageNo;
-            var totalPage=Math.ceil(numOfTasks / constants.OFFSET);
-            next = Number(pageNo) + 1;
+            if (req.query.pageNo == null) 
+                pageNo = 1;
+            else 
+                pageNo = req.query.pageNo;
+            
+                totalPage=Math.ceil(numOfTasks / constants.OFFSET);
+            
+            nextPage = Number(pageNo) + 1;
 
             if (pageNo>totalPage) {
                 utils.writeJson(res, { errors: [{ 'param': 'Server', 'msg': "The page does not exist." }], }, 404);
@@ -102,7 +110,7 @@ module.exports.getPublicTasks = function getPublicTasks(req, res, next) {
                     currentPage: pageNo,
                     totalItems: numOfTasks,
                     tasks: response,
-                    next: "/api/tasks/public?pageNo=" + next
+                    next: "/api/tasks/public?pageNo=" + nextPage
                 });
             }
         })
@@ -119,10 +127,8 @@ module.exports.getOwnedTasks = function getUserTasks(req, res, next) {
         return;
     }
 
-    var numOfTasks = 0;
-    var next=0;
+    numOfTasks = 0;
 
-    var numOfTasks;
     Tasks.getOwnedTasksTotal(req)
         .then(function(response) {
             numOfTasks = response;
@@ -130,11 +136,14 @@ module.exports.getOwnedTasks = function getUserTasks(req, res, next) {
 
     Tasks.getOwnedTasks(req)
         .then(function(response) {
-            if (req.query.pageNo == null) var pageNo = 1;
-            else var pageNo = req.query.pageNo;
-            var totalPage=Math.ceil(numOfTasks / constants.OFFSET);
+            if (req.query.pageNo == null) 
+                pageNo = 1;
+            else 
+                pageNo = req.query.pageNo;
             
-            next = Number(pageNo) + 1;
+            totalPage=Math.ceil(numOfTasks / constants.OFFSET);
+            
+            nextPage = Number(pageNo) + 1;
 
             if (pageNo>totalPage) {
                 utils.writeJson(res, { errors: [{ 'param': 'Server', 'msg': "The page does not exist." }], }, 404);
@@ -146,7 +155,7 @@ module.exports.getOwnedTasks = function getUserTasks(req, res, next) {
                     tasks: response
                 });
             } else {
-                var nextLink = "/api/users/" + req.params.userId + "/tasks/created?pageNo=" + next;
+                nextLink = "/api/users/" + req.params.userId + "/tasks/created?pageNo=" + nextPage;
                 utils.writeJson(res, {
                     totalPages: totalPage,
                     currentPage: pageNo,
@@ -166,10 +175,8 @@ module.exports.getAssignedTasks = function getAssignedTasks(req, res, next) {
         return;
     }
 
-    var numOfTasks = 0;
-    var next=0;
-
-    var numOfTasks;
+    numOfTasks = 0;
+   
     Tasks.getAssignedTasksTotal(req)
         .then(function(response) {
             numOfTasks = response;
@@ -177,11 +184,14 @@ module.exports.getAssignedTasks = function getAssignedTasks(req, res, next) {
 
     Tasks.getAssignedTasks(req)
         .then(function(response) {
-            if (req.query.pageNo == null) var pageNo = 1;
-            else var pageNo = req.query.pageNo;
-            var totalPage=Math.ceil(numOfTasks / constants.OFFSET);
+            if (req.query.pageNo == null) 
+                pageNo = 1;
+            else 
+                pageNo = req.query.pageNo;
+
+            totalPage=Math.ceil(numOfTasks / constants.OFFSET);
             
-            next = Number(pageNo) + 1;
+            nextPage = Number(pageNo) + 1;
 
             if (pageNo>totalPage) {
                 utils.writeJson(res, { errors: [{ 'param': 'Server', 'msg': "The page does not exist." }], }, 404);
@@ -193,7 +203,7 @@ module.exports.getAssignedTasks = function getAssignedTasks(req, res, next) {
                     tasks: response
                 });
             } else {
-                var nextLink = "/api/users/" + req.params.userId + "/tasks/assigned?pageNo=" + next;
+                nextLink = "/api/users/" + req.params.userId + "/tasks/assigned?pageNo=" + nextPage;
                 utils.writeJson(res, {
                     totalPages: totalPage,
                     currentPage: pageNo,
