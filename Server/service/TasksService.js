@@ -8,6 +8,7 @@ const MQTTTaskMessage = require('../components/mqtt_task_message.js');
 const MQTTPublicTaskMessage = require('../components/mqtt_public_task_message.js');
 
 
+
 /**
  * Create a new task
  *
@@ -32,6 +33,7 @@ exports.addTask = function(task, owner) {
                 var createdTask = new Task(this.lastID, task.description, task.important, task.private, task.deadline, task.project, task.completed, task.active);
                 if(!task.private){
                    mqtt.publishPublicTaskMessage(new MQTTPublicTaskMessage("createdPubTask", this.lastID, createdTask));
+                   mqtt.addPublishPublicTaskMessage(this.lastID)
                 }
                 resolve(createdTask);
             }
@@ -77,6 +79,7 @@ exports.deleteTask = function(taskId, owner) {
                                 mqtt.deleteMessage(taskId);
                                 if(!rows[0].private){
                                     mqtt.publishTaskMessage(taskId, new MQTTPublicTaskMessage("deletePubTask",null,null), true)
+                                    mqtt.deletePublishPublicTaskMessage(taskId);
                                 }
                                 resolve(null);
                             }
@@ -402,12 +405,15 @@ exports.updateSingleTask2 = function (task, taskId, owner) {
                                     // pubblico il nuovo task nel topic PublicTasks
                                     var message = new MQTTPublicTaskMessage("newPubTask", taskId, task);
                                     mqtt.publishPublicTaskMessage(message);
+                                    mqtt.addPublishPublicTaskMessage(taskId)
                                 }else{
                                     // vecchio task pubblico e nuovo task privato
                                     // pubblico il nuovo task nel suo topic
                                     console.log("QUIIXXXXXXXXXXXXX")
+                                    console.log("TASK ID: ", taskId)
                                     var message = new MQTTTaskMessage("remove", null, null);
                                     mqtt.publishTaskMessage(taskId, message, true);
+                                    mqtt.deletePublishPublicTaskMessage(taskId);
                                 }
                             }
 
@@ -463,6 +469,24 @@ exports.updateSingleTask2 = function (task, taskId, owner) {
     });
 }
 
+
+
+exports.retriveAllPublicTasksIds = function () {
+    return new Promise((resolve, reject) => {
+
+        var sql = "SELECT t.id as tid, c.total_rows FROM tasks t, (SELECT count(*) total_rows FROM tasks l WHERE l.private=0) c WHERE  t.private = 0 "
+       
+        db.all(sql, [], (err, rows) => {
+            if (err) {
+                reject(err);
+            } else {
+                let publicTasksIds = rows.map((row) => row.tid);
+                let numberPublicTasksId = rows.length;
+                resolve({publicTasksIds, numberPublicTasksId});
+            }
+        });
+    });
+}
 
 
 /**

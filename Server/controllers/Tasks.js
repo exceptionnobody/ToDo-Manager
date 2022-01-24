@@ -72,7 +72,6 @@ module.exports.getSingleTask = function getSingleTask(req, res, next) {
         });
 };
 
-
 module.exports.getPublicTasks = function getPublicTasks(req, res, next) {
     var numOfTasks = 0;
     var next=0;

@@ -30,7 +30,7 @@ const EventEmitter = require('events');
 const handler = new EventEmitter();
 
 const url = 'ws://localhost:5000'
-let ws = new WebSocket(url)
+var ws = new WebSocket(url)
 
 var mqtt = require('mqtt')
 var clientId = 'mqttjs_' + Math.random().toString(16).substr(2, 8)
@@ -114,7 +114,7 @@ const Main = () => {
       try {
         var parsedMessage = JSON.parse(messageBroker);
 
-        if (topic != "PublicTasks") {
+        if (topic != "PublicTasks" && topic != "RecoveryPublicTasks") {
           if (parsedMessage.status == "deleted")
             client.unsubscribe(topic);
 
@@ -130,6 +130,20 @@ const Main = () => {
         } else {
           if (parsedMessage.status == "newPubTask" || parsedMessage.status == "createdPubTask")
             updateA(parsedMessage)
+          
+          if(topic == "RecoveryPublicTasks"){
+            if(parsedMessage.status == "allPublicTasks"){
+              for(const element of parsedMessage.taskList){
+                if(!PublicMap.has(element)){
+                  console.log("RecoveryPublicTasks")
+                  client.subscribe(String(element), {qos:0})
+                  PublicMap.set(element, {})
+                }
+              }
+            }
+          }
+          
+
         }
       } catch (e) {
         console.log(e);
@@ -151,6 +165,9 @@ const Main = () => {
       console.log(`WebSocket error: ${error}`);
     }
 
+    ws.onclose = function (event) {
+      console.log('The connection has been closed successfully.');
+    };
     ws.onmessage = (e) => {
       try {
         messageReceived(e);
@@ -188,10 +205,12 @@ const Main = () => {
 
   function updateA(messageBroker) {
     client.subscribe(String(messageBroker.id, { qos: 0 }))
-    console.log("Parsed Message newPubTask/createdPubTask")
-    console.log(message)
+    //console.log("Parsed Message newPubTask/createdPubTask")
+    //console.log(messageBroker)
     PublicMap.set(messageBroker.id, messageBroker.task)
-    setPubTasks(state => { return [...state, messageBroker.task] })
+    console.log("MESSAGE BROKER: ",messageBroker)
+    console.log("PUBLICK TASK LIST: ", pubTasks)
+    setPubTasks(state => { return ([...state, messageBroker.task]).sort((a,b)=>parseInt(a.id) < parseInt(b.id) ? -1:1)})
 
   }
 
@@ -234,6 +253,7 @@ const Main = () => {
       temp.push(objectStatus)
 
       setAssignedTaskList(temp)
+      //.sort((a,b)=>{a.taskId.localCompare(b.taskId)   })
     }else{
         temp[index] = objectStatus
         setAssignedTaskList(temp)
@@ -241,8 +261,9 @@ const Main = () => {
     setDirty(true);
   }
 
- const messageReceived = (e) => {
+ const messageReceived = function(e) {
     let datas = JSON.parse(e.data.toString());
+    console.log(datas)
     if (datas.typeMessage == "login") {
 
       let flag = 0;
@@ -333,8 +354,11 @@ const Main = () => {
             PublicMap.set(element.id, element)
           }
         }
-        console.log(tasks)
-        setPubTasks(tasks);
+        //console.log(tasks)
+        setPubTasks(tasks.sort((a,b)=>{if(a.id<b.id) return -1; else return 1}));
+        //.sort((a,b)=>{if(a.id<b.id) return -1; else return 1})
+                          
+        //.sort((a,b)=>{a.taskId.localCompare(b.taskId)   })
       })
       .catch(e => handleErrors(e));
   }
@@ -382,7 +406,7 @@ const Main = () => {
           }
         }
         console.log("Refreshing public tasks",tasks)
-        setPubTasks(tasks);
+        setPubTasks(tasks.sort((a,b)=>{a.taskId.localCompare(b.taskId)   }));
         setDirty(false);
       })
       .catch(e => handleErrors(e));
@@ -467,11 +491,11 @@ const Main = () => {
   const doLogIn = async (credentials) => {
     try {
       const LoggedUser = await API.logIn(credentials);
-
       setUser(LoggedUser);
       setLoggedIn(true);
-      console.log("Public Task Topic.")
+      console.log("PublicTasks Topic. RecoveryPublicTasks Topic.")
       client.subscribe("PublicTasks", { qos: 0 })
+      client.subscribe("RecoveryPublicTasks", {qos:0})
     }
     catch (err) {
       // error is handled and visualized in the login form, do not manage error, throw it
@@ -487,6 +511,7 @@ const Main = () => {
     setDirty(true);
     setPubTasks([]);
     client.unsubscribe("PublicTasks")
+    client.unsubscribe("RecoveryPublicTasks")
     await API.logOut()
     localStorage.removeItem('userId');
     localStorage.removeItem('email');
@@ -561,7 +586,7 @@ const Main = () => {
             <Row className="vh-100 below-nav">
               <TaskMgr taskList={taskList} filter={activeFilter} onDelete={deleteTask} onEdit={handleEdit} onComplete={completeTask} onCheck={selectTask} onSelect={handleSelectFilter} refreshTasks={refreshTasks} onlineList={onlineList} myhandler={handler} assignedTaskList={assignedTaskList}></TaskMgr>
               <Button variant="success" size="lg" className="fixed-right-bottom" onClick={() => setSelectedTask(MODAL.ADD)}>+</Button>
-              {(selectedTask !== MODAL.CLOSED) && <ModalForm task={findTask(selectedTask)} onSave={handleSaveOrUpdate} onClose={handleClose}></ModalForm>}
+              {(selectedTask !== MODAL.CLOSED) && <ModalForm task={findTask(selectedTask)?findTask(selectedTask):null} onSave={handleSaveOrUpdate} onClose={handleClose}></ModalForm>}
             </Row> : <Redirect to="/login" />
           }
         </Route>

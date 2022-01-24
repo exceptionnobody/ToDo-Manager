@@ -34,7 +34,7 @@ const ModalForm = (props) => {
       // we must re-compose the task object from its separated fields
       // deadline propery must be created from the form date and time fields
       // id must be created if already present (edit) not if the task is new
-
+      let newTask;
       let deadline;
       if (deadlineDate !== "" && deadlineTime !== "") {
         deadline = dayjs(deadlineDate + "T" + deadlineTime);
@@ -42,8 +42,12 @@ const ModalForm = (props) => {
       else if (deadlineDate !== "") {
         deadline = dayjs(deadlineDate + "T12:00"); // tasks with no time are due by noon
       }
-      const {active, ...taskModified} = task
-      const newTask = Object.assign({}, taskModified, { description, important: isImportant, private: isPrivate, deadline } );
+      if(task){
+        const {active, ...taskModified} = task 
+        newTask = Object.assign({}, taskModified, { description, important: isImportant, private: isPrivate, deadline } );
+      }else{
+        newTask = Object.assign({}, { description, important: isImportant, private: isPrivate, deadline } );
+      }
       if(taskProject != null) 
           newTask.project = taskProject;
 
@@ -93,7 +97,7 @@ const ModalForm = (props) => {
           </Form.Group>
           <Form.Group controlId="form-project">
               <Form.Label>Project</Form.Label>
-              <Form.Control type="text" name="project" placeholder="Enter a new task project" value = {taskProject} onChange={(ev) => setTaskProject(ev.target.value)}/>
+              <Form.Control type="text" name="project" placeholder="Enter a new task project" value = {taskProject?taskProject:''} onChange={(ev) => setTaskProject(ev.target.value)}/>
           </Form.Group>
           <Form.Group controlId="form-is-important">
             <Form.Check custom type="checkbox" label="Important" name="isImportant" checked={isImportant} onChange={(ev) => setIsImportant(ev.target.checked)} />

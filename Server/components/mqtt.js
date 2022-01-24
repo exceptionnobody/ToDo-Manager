@@ -2,7 +2,9 @@
 
 var mqtt = require('mqtt');
 var Assignments = require('../service/AssignmentsService');
+var Tasks = require('../service/TasksService.js');
 var MQTTTaskMessage = require('./mqtt_task_message.js');
+var MQTTAllPublicTaskMessage = require('./mqtt_all_public_task.js');
 
 var host = 'ws://localhost:8080';
 var clientId = 'mqttjs_server' + Math.random().toString(16).substr(2, 8);
@@ -23,6 +25,8 @@ var options = {
 var mqtt_connection = mqtt.connect(host, options);
 
 var taskMessageMap = new Map();
+var publicTasksList = new Map();
+
 
 mqtt_connection.on('error', function (err) {
   console.log(err)
@@ -43,6 +47,21 @@ mqtt_connection.on('connect', function () {
   }) .catch(function (error) {
     mqtt_connection.end();
   });
+
+  Tasks.retriveAllPublicTasksIds().then(function(response) {
+
+    console.log("Response: ", response)
+    if(response.numberPublicTasksId){
+      
+      for(const item of response.publicTasksIds)
+          if(!publicTasksList.has(item) ){
+              publicTasksList.set(item)
+          }
+      
+    }
+    mqtt_connection.publish("RecoveryPublicTasks",JSON.stringify(new MQTTAllPublicTaskMessage("allPublicTasks", [...publicTasksList.keys()].length, [...publicTasksList.keys()])), {qos:0, retain:true})
+   
+  })
 })
 
 mqtt_connection.on('close', function () {
@@ -60,6 +79,20 @@ module.exports.publishTaskMessage = function publishTaskMessage(taskId, message,
 
 module.exports.publishPublicTaskMessage = function publishPublicTaskMessage(message) {
   mqtt_connection.publish("PublicTasks", JSON.stringify(message), { qos: 0 })
+};
+
+module.exports.addPublishPublicTaskMessage = function addPublishPublicTaskMessage(taskId) {
+  
+  publicTasksList.set(parseInt(taskId))
+  console.log("ADD A TASK: PUBLICKTASKLIST: ", [...publicTasksList.keys()], "SIZEPUBLICTASKS: ", [...publicTasksList.keys()].length)
+  mqtt_connection.publish("RecoveryPublicTasks",JSON.stringify(new MQTTAllPublicTaskMessage("allPublicTasks", [...publicTasksList.keys()].length, [...publicTasksList.keys()])), {qos:0, retain:true})
+};
+
+module.exports.deletePublishPublicTaskMessage = function deletePublishPublicTaskMessage(taskId) {
+  
+  publicTasksList.delete(parseInt(taskId))
+  console.log("ADD A TASK: PUBLICKTASKLIST: ", [...publicTasksList.keys()], "SIZEPUBLICTASKS: ", [...publicTasksList.keys()].length)
+  mqtt_connection.publish("RecoveryPublicTasks",JSON.stringify(new MQTTAllPublicTaskMessage("allPublicTasks", [...publicTasksList.keys()].length, [...publicTasksList.keys()])), {qos:0, retain:true})
 };
 
 module.exports.saveMessage = function saveMessage(taskId, message) {
