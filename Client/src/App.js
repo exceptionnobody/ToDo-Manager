@@ -23,6 +23,7 @@ import { Route, useRouteMatch, useHistory, Switch, Redirect, BrowserRouter as Ro
 import dayjs from 'dayjs';
 import isToday from 'dayjs/plugin/isToday';
 
+
 dayjs.extend(isToday);
 
 const EventEmitter = require('events');
@@ -50,7 +51,8 @@ var options = {
 var host = 'ws://127.0.0.1:8080'
 var client = mqtt.connect(host, options);
 var PublicMap = new Map()
-
+var OwnTasksMaps = new Map() 
+var temp = []
 const App = () => {
 
   // Need to place <Router> above the components that use router hooks
@@ -90,6 +92,7 @@ const Main = () => {
   const handleSelectFilter = (filter) => {
     history.push("/list/" + filter);
   }
+  var TestLista = []
 
 
   useEffect(() => {
@@ -114,9 +117,10 @@ const Main = () => {
         if (topic != "PublicTasks") {
           if (parsedMessage.status == "deleted")
             client.unsubscribe(topic);
-          if (parsedMessage.status == "active" || parsedMessage.status == "inactive")
-            displayTaskSelection(topic, parsedMessage);
 
+          if (parsedMessage.status == "active" || parsedMessage.status == "inactive")
+             displayTaskSelection(topic, parsedMessage);
+          
           if (parsedMessage.status == "remove" || parsedMessage.status == "deletePubTask")
             updateB(topic)
 
@@ -204,7 +208,7 @@ const Main = () => {
     console.log("Parsed Message update")
 
     console.log("topic: ", topic)
-    console.log(message)
+    console.log(messageBroker)
     PublicMap.set(parseInt(topic), messageBroker.task)
     setPubTasks(oldstate => {
       let newState = oldstate.map((item) => {
@@ -222,27 +226,22 @@ const Main = () => {
   const displayTaskSelection = (topic, parsedMessage) => {
     handler.emit(topic, parsedMessage);
 
-    var index = assignedTaskList.findIndex(x => x.taskId == topic);
+    var index = temp.findIndex(x => x.taskId == topic);
     let objectStatus = { taskId: topic, userName: parsedMessage.userName, status: parsedMessage.status };
-    index === -1 ? setAssignedTaskList(oldState => { return [...oldState, objectStatus] }) : setAssignedTaskList(oldState => {
+    console.log("Topic: ", topic, " Index: ", index, " ParsedMessage: ", parsedMessage)
+    if(index === -1){
+      
+      temp.push(objectStatus)
 
-      let newState = oldState.map((item, j) => {
-
-        if (j == index)
-          return objectStatus
-        else
-          return item
-      })
-      return newState
-
-
-    })
-
+      setAssignedTaskList(temp)
+    }else{
+        temp[index] = objectStatus
+        setAssignedTaskList(temp)
+    }
     setDirty(true);
   }
 
-
-  const messageReceived = (e) => {
+  const messageReceived2 = (e) => {
     let datas = JSON.parse(e.data.toString());
     if (datas.typeMessage == "login") {
       let flag = 0;
@@ -282,6 +281,53 @@ const Main = () => {
     setDirty(true);
   }
 
+  const messageReceived = (e) => {
+    let datas = JSON.parse(e.data.toString());
+    if (datas.typeMessage == "login") {
+
+      let flag = 0;
+      for (let i = 0; i < TestLista.length; i++) {
+        if (TestLista[i].userId == datas.userId) {
+          flag = 1;
+        }
+      }
+      if (flag == 0) {
+        TestLista.push(datas);
+        setOnlineList(TestLista);
+      }
+    }
+    if (datas.typeMessage == "logout") {
+
+      for (let i = 0; i < TestLista.length; i++) {
+        if (TestLista[i].userId == datas.userId) {
+          TestLista.splice(i, 1);
+        }
+      }
+      setOnlineList(TestLista);
+ 
+      
+      }
+
+      if (datas.typeMessage == "update") {
+
+          let flag = 0;
+          for (let i = 0; i < TestLista.length; i++) {
+            if (TestLista[i].userId == datas.userId) {
+              flag = 1;
+              TestLista[i] = datas;
+              setOnlineList(TestLista);
+            }
+          }
+    
+          if (flag == 0) {
+            TestLista.push(datas);
+            setOnlineList(TestLista);
+          }
+    
+  }
+      setDirty(true);
+}
+
 
   const deleteTask = (task) => {
     API.deleteTask(task)
@@ -300,13 +346,16 @@ const Main = () => {
     return taskList.find(t => t.id === id);
   }
 
-  const getInitialTasks = () => {
+  const getInitialTasks = function(){
     if (loggedIn) {
       API.getTasks('owned')
         .then(tasks => {
-          for (let i = 0; i < tasks.length; i++) {
-            client.subscribe(String(tasks[i].id), { qos: 0, retain: true });
-            console.log("Subscribing to " + tasks[i].id)
+          for (const element of tasks) {
+            if (!OwnTasksMaps.has(element.id)) {
+              client.subscribe(String(element.id), { qos: 0, retain: true });
+              console.log("Subscribing to " + element.id)
+              OwnTasksMaps.set(element.id, element)
+             }
           }
           setTaskList(tasks);
         })
@@ -349,9 +398,12 @@ const Main = () => {
   const refreshTasks = (filter, page) => {
     API.getTasks(filter, page)
       .then(tasks => {
-        for (let i = 0; i < tasks.length; i++) {
-          client.subscribe(String(tasks[i].id), { qos: 0, retain: true });
-          console.log("Subscribing to " + tasks[i].id)
+        for (const element of tasks) {
+          if (!OwnTasksMaps.has(element.id)) {
+            client.subscribe(String(element.id), { qos: 0, retain: true });
+            console.log("Subscribing to " + element.id)
+            OwnTasksMaps.set(element.id, element)
+           }
         }
         setTaskList(tasks);
         setDirty(false);
@@ -399,9 +451,12 @@ const Main = () => {
     if (loggedIn && dirty) {
       API.getTasks(activeFilter, localStorage.getItem('currentPage'))
         .then(tasks => {
-          for (let i = 0; i < tasks.length; i++) {
-            client.subscribe(String(tasks[i].id), { qos: 0, retain: true });
-            console.log("Subscribing to " + tasks[i].id)
+          for (const element of tasks) {
+            if (!OwnTasksMaps.has(element.id)) {
+              client.subscribe(String(element.id), { qos: 0, retain: true });
+              console.log("Subscribing to " + element.id)
+              OwnTasksMaps.set(element.id, element)
+             }
           }
           setTaskList(tasks);
           setDirty(false);
@@ -486,8 +541,8 @@ const Main = () => {
         <Navigation onLogOut={handleLogOut} loggedIn={loggedIn} user={user} getPublicTasks={getPublicTasks} getInitialTasks={getInitialTasks} />
       </Row>
 
-      <Toast show={message !== ''} onClose={() => setMessage('')} delay={3000} autohide>
-        <Toast.Body>{message?.msg}</Toast.Body>
+      <Toast show={message != ''} onClose={() => setMessage('')} delay={5000} autohide>
+        <Toast.Body>{message.msg}</Toast.Body>
       </Toast>
 
       <Switch>
@@ -544,7 +599,7 @@ const Main = () => {
         <Route path={["/list/:filter"]}>
           {loggedIn ?
             <Row className="vh-100 below-nav">
-              <TaskMgr taskList={taskList} filter={activeFilter} onDelete={deleteTask} onEdit={handleEdit} onComplete={completeTask} onCheck={selectTask} onSelect={handleSelectFilter} refreshTasks={refreshTasks} onlineList={onlineList} handler={handler} assignedTaskList={assignedTaskList}></TaskMgr>
+              <TaskMgr taskList={taskList} filter={activeFilter} onDelete={deleteTask} onEdit={handleEdit} onComplete={completeTask} onCheck={selectTask} onSelect={handleSelectFilter} refreshTasks={refreshTasks} onlineList={onlineList} myhandler={handler} assignedTaskList={assignedTaskList}></TaskMgr>
               <Button variant="success" size="lg" className="fixed-right-bottom" onClick={() => setSelectedTask(MODAL.ADD)}>+</Button>
               {(selectedTask !== MODAL.CLOSED) && <ModalForm task={findTask(selectedTask)} onSave={handleSaveOrUpdate} onClose={handleClose}></ModalForm>}
             </Row> : <Redirect to="/login" />
@@ -563,7 +618,7 @@ const Main = () => {
 
 const TaskMgr = (props) => {
 
-  const { taskList, filter, onDelete, onEdit, onComplete, onCheck, onSelect, refreshTasks, onlineList, handler, assignedTaskList } = props;
+  const { taskList, filter, onDelete, onEdit, onComplete, onCheck, onSelect, refreshTasks, onlineList, myhandler, assignedTaskList } = props;
 
 
   // ** FILTER DEFINITIONS **
@@ -586,7 +641,7 @@ const TaskMgr = (props) => {
         <ContentList
           tasks={taskList}
           onDelete={onDelete} onEdit={onEdit} onCheck={onCheck} onComplete={onComplete} filter={activeFilter} getTasks={refreshTasks}
-          handler={handler} assignedTaskList={assignedTaskList}
+          handler={myhandler} assignedTaskList={assignedTaskList}
         />
       </Col>
     </>

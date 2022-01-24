@@ -208,13 +208,13 @@ exports.selectTask = function selectTask(userId, taskId) {
                                                             //publish the MQTT message for the selected task
                                                             var message = new MQTTTaskMessage("active", parseInt(userId), rows2[0].name);
                                                             mqtt.saveMessage(taskId, message);
-                                                            mqtt.publishTaskMessage(taskId, message);
+                                                            mqtt.publishTaskMessage(taskId, message,null);
 
                                                             //publish the MQTT message for the selected task
                                                             if(deselected){
                                                                 var message = new MQTTTaskMessage("inactive", null, null);
                                                                 mqtt.saveMessage(deselected, message);
-                                                                mqtt.publishTaskMessage(deselected, message);
+                                                                mqtt.publishTaskMessage(deselected, message,null);
                                                             }
 
                                                             //inform the clients that the user selected a different task where they are working on

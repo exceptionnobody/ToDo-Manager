@@ -155,7 +155,7 @@ async function selectTask(task) {
   const response = await fetch(BASEURL + "/users/" + localStorage.getItem('userId') + '/selection', {method: 'PUT', headers: {'Content-Type': 'application/json',},
                     body: JSON.stringify(task)});
   if(!response.ok){
-    let err = { status: response.status, errObj: response.json };
+    let err = { status: response.status, errObj: response.json, error: response.statusText, body: response.body }
     throw err; 
   }
 }
