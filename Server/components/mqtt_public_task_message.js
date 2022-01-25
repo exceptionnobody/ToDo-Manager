@@ -4,7 +4,6 @@ class MQTTPublicTaskMessage {
         this.status = status;
         this.id = id;
         if(task) this.task = task;
-
     }
 }
 

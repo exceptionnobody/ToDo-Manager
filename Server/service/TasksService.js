@@ -7,7 +7,7 @@ const mqtt = require('../components/mqtt');
 const MQTTTaskMessage = require('../components/mqtt_task_message.js');
 const MQTTPublicTaskMessage = require('../components/mqtt_public_task_message.js');
 var message;
-
+var pageNo, size;
 
 /**
  * Create a new task
@@ -105,10 +105,10 @@ exports.deleteTask = function(taskId, owner) {
 exports.getPublicTasks = function(req) {
     return new Promise((resolve, reject) => {
 
-        var sql = "SELECT t.id as tid, t.description, t.important, t.private, t.project, t.deadline,t.completed,c.total_rows FROM tasks t, (SELECT count(*) total_rows FROM tasks l WHERE l.private=0) c WHERE  t.private = 0 "
-        var limits = getPagination(req);
+        let sql = "SELECT t.id as tid, t.description, t.important, t.private, t.project, t.deadline,t.completed,c.total_rows FROM tasks t, (SELECT count(*) total_rows FROM tasks l WHERE l.private=0) c WHERE  t.private = 0 "
+        let limits = getPagination(req);
         if (limits.length != 0) sql = sql + " LIMIT ?,?";
-        db.all(sql, limits, (err, rows) => {
+        db.all(sql, [], (err, rows) => {
             if (err) {
                 reject(err);
             } else {
@@ -118,6 +118,25 @@ exports.getPublicTasks = function(req) {
         });
     });
 }
+
+exports.getPublicTasksWithNoLimit = function(req) {
+    return new Promise((resolve, reject) => {
+
+        let sql = "SELECT t.id as tid, t.description, t.important, t.private, t.project, t.deadline,t.completed,c.total_rows FROM tasks t, (SELECT count(*) total_rows FROM tasks l WHERE l.private=0) c WHERE  t.private = 0 "
+        //let limits = getPagination(req);
+        //if (limits.length != 0) sql = sql + " LIMIT ?,?";
+        db.all(sql, [], (err, rows) => {
+            if (err) {
+                reject(err);
+            } else {
+                let tasks = rows.map((row) => createTask(row));
+                resolve(tasks);
+            }
+        });
+    });
+}
+
+
 
 /**
  * Retrieve the number of public tasks
@@ -420,7 +439,7 @@ exports.updateSingleTask2 = function (task, taskId, owner) {
                                     // vecchio task pubblico e nuovo task privato
                                     // pubblico il nuovo task nel suo topic
                                     console.log("TASK ID: ", taskId)
-                                    message = new MQTTTaskMessage("remove", null, null, null);
+                                    message = new MQTTTaskMessage("removeFromPubTasks", null, null, null);
                                     mqtt.publishTaskMessage(taskId, message, true);
                                     mqtt.deletePublishPublicTaskMessage(taskId);
                                 }
@@ -490,7 +509,7 @@ exports.retriveAllPublicTasksIds = function () {
                 reject(err);
             } else {
                 let publicTasksIds = rows.map((row) => row.tid);
-                let numberPublicTasksId = rows.length;
+                let numberPublicTasksId = rows[0].total_rows;
                 resolve({publicTasksIds, numberPublicTasksId});
             }
         });
@@ -502,9 +521,9 @@ exports.retriveAllPublicTasksIds = function () {
  * Utility functions
  */
 const getPagination = function(req) {
-    var pageNo = parseInt(req.query.pageNo);
-    var size = constants.OFFSET;
-    var limits = [];
+    pageNo = parseInt(req.query.pageNo);
+    size = constants.OFFSET;
+    let limits = [];
     if (req.query.pageNo == null) {
         pageNo = 1;
     }

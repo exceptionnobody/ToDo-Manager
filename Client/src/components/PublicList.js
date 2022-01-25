@@ -66,7 +66,8 @@ const PublicList = (props) => {
           })
         }
       </ListGroup>
-      <Pagination 
+      <Pagination
+          key={"Pagination"} 
           itemClass="page-item" // add it for bootstrap 4
           linkClass="page-link" // add it for bootstrap 4
           activePage={parseInt(localStorage.getItem("currentPage"))}

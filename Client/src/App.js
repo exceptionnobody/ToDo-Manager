@@ -56,6 +56,10 @@ var temp = []
 var index;
 var TestLista = new Map()
 
+var constants = Object.freeze({
+  OFFSET: 3,
+});
+
 const App = () => {
 
   // Need to place <Router> above the components that use router hooks
@@ -118,29 +122,44 @@ const Main = () => {
         var parsedMessage = JSON.parse(messageBroker);
 
         if (topic != "PublicTasks" && topic != "RecoveryPublicTasks") {
+          
           if (parsedMessage.status == "deleted")
             client.unsubscribe(topic);
 
           if (parsedMessage.status == "active" || parsedMessage.status == "inactive")
              displayTaskSelection(topic, parsedMessage);
           
-          if (parsedMessage.status == "remove" || parsedMessage.status == "deletePubTask")
+          // gestione dei singoli task pubblici
+
+          if (parsedMessage.status == "removeFromPubTasks" || parsedMessage.status == "deletePubTask")
             updateB(topic)
 
           if (parsedMessage.status == "update")
             updateC(topic, parsedMessage)
+          
+          if (parsedMessage.status == "public"){
+            PublicMap.set(parsedMessage.task.id, parsedMessage.task)
+            client.subscribe(String(parsedMessage.task.id), {qos:0, retain:true})
+          }
 
         } else {
-          if (parsedMessage.status == "newPubTask" || parsedMessage.status == "createdPubTask")
-            updateA(parsedMessage)
-          
+
+          // gestione dei canali 
+          // Topic: PublicTasks per aggiornamenti di task da privati a pubblici e creazioni di tasks pubblici
+          // Topic: RecoveryPublicTasks per il recupero di tutti i tasks pubblici quando un client si connette per la prima volta
+
+          if(topic == "PublicTasks"){
+            if (parsedMessage.status == "newPubTask" || parsedMessage.status == "createdPubTask")
+              updateA(parsedMessage)
+          }
+
           if(topic == "RecoveryPublicTasks"){
             if(parsedMessage.status == "allPublicTasks"){
               for(const element of parsedMessage.taskList){
                 if(!PublicMap.has(element)){
-                  console.log("RecoveryPublicTasks")
-                  client.subscribe(String(element), {qos:0})
-                  PublicMap.set(element, {})
+                  console.log("RecoveryPublicTasks: ",element)
+                  client.subscribe(String(element), {qos:0, retain:true})
+                  
                 }
               }
             }
@@ -207,14 +226,24 @@ const Main = () => {
 
 
   function updateA(messageBroker) {
-    client.subscribe(String(messageBroker.id, { qos: 0 }))
+    client.subscribe(String(messageBroker.id, { qos: 0, retain:true }))
     //console.log("Parsed Message newPubTask/createdPubTask")
     //console.log(messageBroker)
     PublicMap.set(messageBroker.id, messageBroker.task)
     console.log("MESSAGE BROKER: ",messageBroker)
     console.log("PUBLICK TASK LIST: ", pubTasks)
-    setPubTasks(state => { return ([...state, messageBroker.task]).sort((a,b)=>parseInt(a.id) < parseInt(b.id) ? -1:1)})
-
+    if([...PublicMap.values()].map(x=>x).length <= constants.OFFSET){
+      localStorage.setItem('totalPages',  1);
+      localStorage.setItem('currentPage', 1);
+      localStorage.setItem('totalItems',  [...PublicMap.values()].map(x=>x).length.toString());
+      setPubTasks(state => { return ([...state, messageBroker.task]).sort((a,b)=>parseInt(a.id) < parseInt(b.id) ? -1:1)})
+    }else{
+      var totalPage= Math.ceil([...PublicMap.values()].map(x=>x).length / constants.OFFSET);
+      var totalItems = [...PublicMap.values()].map(x=>x).length;
+      localStorage.setItem('totalPages',totalPage.toString());
+      localStorage.setItem('totalItems',totalItems.toString());
+      //var nextPage = Number( localStorage.getItem("currentPage")) + 1;
+    }
   }
 
   function updateB(topic) {
@@ -418,6 +447,49 @@ const Main = () => {
   }
 
   const getPublicTasks = () => {
+    /*API.getPublicTasks()
+      .then(tasks => {
+        for (const element of tasks) {
+          if (!PublicMap.has(element.id)) {
+            client.subscribe(String(element.id), { qos: 0, retain: true });
+            console.log("Subscribing to public task: " + element.id)
+            PublicMap.set(element.id, element)
+          }
+        }
+        //console.log(tasks) sorting dopo .sort((a,b)=>{if(parseInt(a.id)<parseInt(b.id)) return -1; else return 1}));
+        let array = PublicMap.values().map(x=>x)
+        setPubTasks([...PublicMap.values()]
+        //.sort((a,b)=>{if(a.id<b.id) return -1; else return 1})
+                          
+        //.sort((a,b)=>{a.taskId.localCompare(b.taskId)   })
+      })
+      .catch(e => handleErrors(e));
+      */
+      let array = []
+      
+      for(const [key, value] of PublicMap.entries())
+          array.push(value)
+      console.log(array)
+      console.log(PublicMap)
+      if(array.length <= constants.OFFSET){
+        localStorage.setItem('totalPages',  1);
+        localStorage.setItem('currentPage', 1);
+        localStorage.setItem('totalItems',  array.length.toString());
+        setPubTasks([...array.filter((x,j)=> {if(j < constants.OFFSET) return x}) ].sort((a,b)=> a.id < b.id ? -1: 1))
+      }else{
+        var totalPage= Math.ceil(array.length / constants.OFFSET);
+        var totalItems = array.length;
+        localStorage.setItem('totalPages',totalPage.toString());
+        localStorage.setItem('totalItems',totalItems.toString());
+        console.log("ARRAY")
+        console.log(        [...array.filter((x,j)=> {if(j < constants.OFFSET) return x}) ].sort((a,b)=> a.id < b.id ? -1: 1)       )
+        setPubTasks([...array.filter((x,j)=> {if(j < constants.OFFSET) return x}) ].sort((a,b)=> a.id < b.id ? -1: 1))
+        //var nextPage = Number( localStorage.getItem("currentPage")) + 1;
+      }
+      
+  }
+
+  const getPublicTasks2 = () => {
     API.getPublicTasks()
       .then(tasks => {
         for (const element of tasks) {
@@ -427,13 +499,18 @@ const Main = () => {
             PublicMap.set(element.id, element)
           }
         }
-        //console.log(tasks)
-        setPubTasks(tasks.sort((a,b)=>{if(a.id<b.id) return -1; else return 1}));
+        console.log("FORMATO DEI TASK DA VISUALIZZARE")
+        console.log(tasks)
+        console.log("FORMATO DEI TASK CHE HO IN PUBTASKMAP")
+        console.log(PublicMap)
+        setPubTasks([...tasks].sort((a,b)=>{if(parseInt(a.id)<parseInt(b.id)) return -1; else return 1}));
         //.sort((a,b)=>{if(a.id<b.id) return -1; else return 1})
                           
         //.sort((a,b)=>{a.taskId.localCompare(b.taskId)   })
       })
       .catch(e => handleErrors(e));
+      
+      //setPubTasks([...PublicMap.values()].sort((a,b)=>{if(parseInt(a.id)<parseInt(b.id)) return -1; else return 1}));
   }
 
   const getAllOwnedTasks = () => {
@@ -453,6 +530,7 @@ const Main = () => {
   }
 
   const refreshTasks = (filter, page) => {
+    
     API.getTasks(filter, page)
       .then(tasks => {
         for (const element of tasks) {
@@ -466,9 +544,11 @@ const Main = () => {
         setDirty(false);
       })
       .catch(e => handleErrors(e));
+    
   }
 
   const refreshPublic = (page) => {
+    /*
     API.getPublicTasks(page)
       .then(tasks => {
         for (const element of tasks) {
@@ -483,6 +563,20 @@ const Main = () => {
         setDirty(false);
       })
       .catch(e => handleErrors(e));
+      */
+
+      let array = []
+      console.log("Page: ", page)
+      for(const [key, value] of PublicMap.entries())
+          array.push(value)
+
+      if(page >= 1 && page <= Number(localStorage.getItem('totalPages'))){
+        
+        localStorage.setItem('currentPage',page.toString());
+        console.log("ARRAY")
+        console.log(        [...array.filter((x,j)=> {if(j < constants.OFFSET) return x}) ].sort((a,b)=> a.id < b.id ? -1: 1)       )
+        setPubTasks([...array.filter((x,j)=> {if(j >= (page-1)*constants.OFFSET && j < page*constants.OFFSET) return x}) ].sort((a,b)=> a.id < b.id ? -1: 1))
+      }
   }
 
   const assignTask = (userId, tasksId) => {
