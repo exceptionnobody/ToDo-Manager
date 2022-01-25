@@ -61,16 +61,15 @@ mqtt_connection.on('connect', function () {
     Tasks.retriveAllPublicTasksIds().then(function(response) {
 
       console.log("Response: ", response)
-      if(response.numberPublicTasksId){
-        
+      
+      if(response.numberPublicTasksId){ 
         for(const item of response.publicTasksIds)
-            if(!publicTasksMap.has(item) ){
-                publicTasksMap.set(item)
+          if(!publicTasksMap.has(item))
+            publicTasksMap.set(parseInt(item))
                 
-            }
-        
       }
-      mqtt_connection.publish("RecoveryPublicTasks",JSON.stringify(new MQTTAllPublicTaskMessage("allPublicTasks", [...publicTasksMap.keys()].length, [...publicTasksMap.keys()])), {qos:0, retain:true})
+        
+      mqtt_connection.publish("RecoveryPublicTasks",JSON.stringify(new MQTTAllPublicTaskMessage("allPublicTasks", response.numberPublicTasksId, response.publicTasksIds.sort((a,b)=> a<b?-1:1))), {qos:0, retain:true})
      
     })
 
@@ -85,12 +84,8 @@ mqtt_connection.on('close', function () {
   console.log(clientId + ' disconnected');
 })
 
-module.exports.publishTaskMessage = function publishTaskMessage(taskId, message, retain) {
-  //settare retain = true
-    if(retain)
-      mqtt_connection.publish(String(taskId), JSON.stringify(message), { qos: 0, retain:false})
-    else
-      mqtt_connection.publish(String(taskId), JSON.stringify(message), { qos: 0, retain:true})
+module.exports.publishTaskMessage = function publishTaskMessage(taskId, message) {
+  mqtt_connection.publish(String(taskId), JSON.stringify(message), { qos: 0, retain:true})
 
 };
 

@@ -57,7 +57,7 @@ var index;
 var TestLista = new Map()
 
 var constants = Object.freeze({
-  OFFSET: 3,
+  OFFSET: 10,
 });
 
 const App = () => {
@@ -123,8 +123,11 @@ const Main = () => {
 
         if (topic != "PublicTasks" && topic != "RecoveryPublicTasks") {
           
-          if (parsedMessage.status == "deleted")
+          if (parsedMessage.status == "deleted"){
             client.unsubscribe(topic);
+            displayTaskSelection(topic, parsedMessage);
+          }
+            
 
           if (parsedMessage.status == "active" || parsedMessage.status == "inactive")
              displayTaskSelection(topic, parsedMessage);
@@ -155,13 +158,21 @@ const Main = () => {
 
           if(topic == "RecoveryPublicTasks"){
             if(parsedMessage.status == "allPublicTasks"){
-              for(const element of parsedMessage.taskList){
-                if(!PublicMap.has(element)){
-                  console.log("RecoveryPublicTasks: ",element)
-                  client.subscribe(String(element), {qos:0, retain:true})
-                  
+              console.log(parsedMessage)
+              let totalPublicPage= Math.ceil( parseInt(parsedMessage.number)/constants.OFFSET);
+
+              for(const task of parsedMessage.taskList){
+                if(!PublicMap.has(task)){
+                  console.log("RecoveryPublicTasks: ",task)
+                  client.subscribe(String(task), {qos:0, retain:true})
                 }
               }
+              localStorage.setItem('totalPublicPages',  String(totalPublicPage));
+              localStorage.setItem('totalPublicItems',  String(parsedMessage.number));
+              console.log("TOTALPUBLICPAGE: ", localStorage.getItem("totalPublicPages"))
+              console.log("TOTALPUBLICITEMS: ", localStorage.getItem("totalPublicItems"))
+              console.log("TERMINE RECOVERY PUB TASKS: ", PublicMap)
+              client.unsubscribe("RecoveryPublicTasks")
             }
           }
           
@@ -226,33 +237,58 @@ const Main = () => {
 
 
   function updateA(messageBroker) {
-    client.subscribe(String(messageBroker.id, { qos: 0, retain:true }))
+    client.subscribe(String(messageBroker.id), { qos: 0, retain:true })
     //console.log("Parsed Message newPubTask/createdPubTask")
     //console.log(messageBroker)
-    PublicMap.set(messageBroker.id, messageBroker.task)
-    console.log("MESSAGE BROKER: ",messageBroker)
-    console.log("PUBLICK TASK LIST: ", pubTasks)
-    if([...PublicMap.values()].map(x=>x).length <= constants.OFFSET){
-      localStorage.setItem('totalPages',  1);
-      localStorage.setItem('currentPage', 1);
-      localStorage.setItem('totalItems',  [...PublicMap.values()].map(x=>x).length.toString());
-      setPubTasks(state => { return ([...state, messageBroker.task]).sort((a,b)=>parseInt(a.id) < parseInt(b.id) ? -1:1)})
-    }else{
-      var totalPage= Math.ceil([...PublicMap.values()].map(x=>x).length / constants.OFFSET);
-      var totalItems = [...PublicMap.values()].map(x=>x).length;
-      localStorage.setItem('totalPages',totalPage.toString());
-      localStorage.setItem('totalItems',totalItems.toString());
-      //var nextPage = Number( localStorage.getItem("currentPage")) + 1;
-    }
+    PublicMap.set(parseInt(messageBroker.id), messageBroker.task)
+    
+    var totalPublicPage= Math.ceil([...PublicMap.values()].map(x=>x).length / constants.OFFSET);
+    var totalPublicItems = [...PublicMap.values()].map(x=>x).length;
+    
+    localStorage.setItem('totalPublicPages',totalPublicPage.toString());
+    localStorage.setItem('totalPublicItems',totalPublicItems.toString());
+    
+    let pageNumber = Number(localStorage.getItem('currentPage'))
+    let newArray = [...PublicMap.values()].sort((a,b)=>parseInt(a.id) < parseInt(b.id) ? -1:1)
+
+
+      setPubTasks(newArray.filter((x,j)=> {if(j>=(pageNumber-1)*constants.OFFSET && j < (pageNumber)*constants.OFFSET) return x}))
+
+      //if(newArray.length%(constants.OFFSET+1)){    }else{
+
+    //}
   }
 
   function updateB(topic) {
     console.log("Parsed Message remove/deletePubTask")
     client.unsubscribe(topic)
-    console.log("topic: ", topic,"PubTasks: ", pubTasks)
+    if(PublicMap.has(parseInt(topic))){
+      console.log("Sono qui: ", topic)
     PublicMap.delete(parseInt(topic))
-    setPubTasks(oldstate => { return (oldstate.filter((item) => item.id !== parseInt(topic))).sort((a,b)=>parseInt(a.id)<parseInt(b.id)?-1:1) })
-
+    let temporalState =  ([...PublicMap.values()].filter((item) => item.id !== parseInt(topic))).sort((a,b)=>parseInt(a.id)<parseInt(b.id)?-1:1)
+    var totalPublicPage= Math.ceil(PublicMap.size / constants.OFFSET);
+    var totalPublicItems = PublicMap.size;
+    localStorage.setItem('totalPublicPages',totalPublicPage.toString());
+    localStorage.setItem('totalPublicItems',totalPublicItems.toString());
+    
+    if(totalPublicItems%constants.OFFSET){
+      //let temporalState =  (oldstate.filter((item) => item.id !== parseInt(topic))).sort((a,b)=>parseInt(a.id)<parseInt(b.id)?-1:1) 
+      //setPubTasks(oldstate => { return (oldstate.filter((item) => item.id !== parseInt(topic))).sort((a,b)=>parseInt(a.id)<parseInt(b.id)?-1:1) })
+      let pageNumber = Number(localStorage.getItem('currentPage'))
+      setPubTasks(temporalState.filter((x,j)=> {if(j>=(pageNumber-1)*constants.OFFSET && j < (pageNumber)*constants.OFFSET) return x}))
+    }else{
+        let num= Number(localStorage.getItem('currentPage'))
+        if(num != 1){
+          num= Number(localStorage.getItem('currentPage'))-1
+          localStorage.setItem('currentPage', num.toString())
+          setPubTasks(temporalState.filter((x,j)=> {if(j>=(num-1)*constants.OFFSET && j < (num)*constants.OFFSET) return x}))
+        }else{
+          num = 1;
+          localStorage.setItem('currentPage', num.toString())
+          setPubTasks(temporalState.filter((x,j)=> {if(j>=(num-1)*constants.OFFSET && j < (num)*constants.OFFSET) return x}))
+        }
+    }
+  }
   }
 
   function updateC(topic, messageBroker) {
@@ -263,7 +299,7 @@ const Main = () => {
     // funziona: PublicMap.set(parseInt(topic), messageBroker.task)
     
     if(!messageBroker.task.private){
-      PublicMap.set(topic, messageBroker.task)
+      PublicMap.set(parseInt(topic), messageBroker.task)
       setPubTasks(oldstate => {
         return oldstate.map((item) => {
 
@@ -465,27 +501,23 @@ const Main = () => {
       })
       .catch(e => handleErrors(e));
       */
-      let array = []
-      
-      for(const [key, value] of PublicMap.entries())
-          array.push(value)
-      console.log(array)
+
       console.log(PublicMap)
-      if(array.length <= constants.OFFSET){
-        localStorage.setItem('totalPages',  1);
-        localStorage.setItem('currentPage', 1);
-        localStorage.setItem('totalItems',  array.length.toString());
-        setPubTasks([...array.filter((x,j)=> {if(j < constants.OFFSET) return x}) ].sort((a,b)=> a.id < b.id ? -1: 1))
-      }else{
-        var totalPage= Math.ceil(array.length / constants.OFFSET);
-        var totalItems = array.length;
-        localStorage.setItem('totalPages',totalPage.toString());
-        localStorage.setItem('totalItems',totalItems.toString());
+      console.log(PublicMap.size)
+
+      console.log("TOTAL PUBLIC TASKS RECEIVED: ", PublicMap.size)
+      let newTempArray = [...PublicMap.values()].sort((a,b)=>a.id<b.id?-1:1)
+      console.log("ARRAY GETPUBPAGE: ", newTempArray)
+      console.log("ARRAY FILTRATO: ", newTempArray.filter((_,temindex)=>(temindex>=0&&temindex<constants.OFFSET )))
+      setPubTasks(newTempArray.filter((_,temindex)=>(temindex>=0&&temindex<constants.OFFSET )))
+
+      
+      /*else{
         console.log("ARRAY")
         console.log(        [...array.filter((x,j)=> {if(j < constants.OFFSET) return x}) ].sort((a,b)=> a.id < b.id ? -1: 1)       )
         setPubTasks([...array.filter((x,j)=> {if(j < constants.OFFSET) return x}) ].sort((a,b)=> a.id < b.id ? -1: 1))
-        //var nextPage = Number( localStorage.getItem("currentPage")) + 1;
       }
+      */
       
   }
 
@@ -565,17 +597,18 @@ const Main = () => {
       .catch(e => handleErrors(e));
       */
 
-      let array = []
-      console.log("Page: ", page)
-      for(const [key, value] of PublicMap.entries())
-          array.push(value)
-
-      if(page >= 1 && page <= Number(localStorage.getItem('totalPages'))){
+      let newTempArray = [...PublicMap.values()].sort((a,b)=>a.id<b.id?-1:1)
+      var totalPage= Math.ceil(PublicMap.size / constants.OFFSET);
+      var totalItems = PublicMap.size;
+      localStorage.setItem('totalPublicPages',  totalPage.toString());
+      localStorage.setItem('totalPublicItems',  totalItems.toString());
+      if(page >= 1 && page <= Number(localStorage.getItem('totalPublicPages'))){
         
         localStorage.setItem('currentPage',page.toString());
+        let pageNumber = parseInt(page)
         console.log("ARRAY")
-        console.log(        [...array.filter((x,j)=> {if(j < constants.OFFSET) return x}) ].sort((a,b)=> a.id < b.id ? -1: 1)       )
-        setPubTasks([...array.filter((x,j)=> {if(j >= (page-1)*constants.OFFSET && j < page*constants.OFFSET) return x}) ].sort((a,b)=> a.id < b.id ? -1: 1))
+        console.log(newTempArray.filter((_,tempIndex)=> (tempIndex >= ((pageNumber-1)*constants.OFFSET) && tempIndex < ((pageNumber)*constants.OFFSET)) ) )
+        setPubTasks(newTempArray.filter((_,tempIndex)=> (tempIndex >= ((pageNumber-1)*constants.OFFSET) && tempIndex < ((pageNumber)*constants.OFFSET)) ))
       }
   }
 
@@ -663,8 +696,12 @@ const Main = () => {
       setUser(LoggedUser);
       setLoggedIn(true);
       console.log("PublicTasks Topic. RecoveryPublicTasks Topic.")
-      client.subscribe("PublicTasks", { qos: 0 })
-      client.subscribe("RecoveryPublicTasks", {qos:0})
+      client.subscribe("PublicTasks", { qos: 0, retain: true })
+      client.subscribe("RecoveryPublicTasks", {qos:0, retain: true})
+
+      localStorage.setItem('totalPublicItems','test');
+      localStorage.setItem('totalPublicPages', 'test');
+
     }
     catch (err) {
       // error is handled and visualized in the login form, do not manage error, throw it
@@ -674,17 +711,32 @@ const Main = () => {
 
   const handleLogOut = async () => {
     // clean up everything
+
+    for(const [key, val] of PublicMap.entries()){
+      client.unsubscribe(String(val.id))
+      console.log("Unsubscribe of topic: ", val.id)
+    }
+    PublicMap.clear()
+    OwnTasksMaps.clear()
+    TestLista.clear()
     setLoggedIn(false);
     setUser(null);
     setTaskList([]);
     setDirty(true);
     setPubTasks([]);
-    client.unsubscribe("PublicTasks")
+
+   client.unsubscribe("PublicTasks")
     client.unsubscribe("RecoveryPublicTasks")
     await API.logOut()
+    localStorage.removeItem('currentPage');
+    localStorage.removeItem('totalItems');
+    localStorage.removeItem('totalPublicItems');
+    localStorage.removeItem('totalPublicPages');
+    localStorage.removeItem('totalPages');
     localStorage.removeItem('userId');
     localStorage.removeItem('email');
     localStorage.removeItem('username');
+
   }
 
 
