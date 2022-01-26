@@ -32,6 +32,7 @@ exports.addTask = function(task, owner) {
                     let mess = new MQTTTaskMessage("insertPublicTask",null,null,createdPubTask)
                     mqtt.publishTaskMessage(this.lastID,mess)
                     mqtt.publishPublicTaskMessage(new MQTTPublicTaskMessage("createdPubTask", this.lastID));
+                    resolve(null);
                    
                  } else{
                 //Creation of a new private task and I sent a MQTT message for the created task
@@ -526,7 +527,7 @@ exports.retriveAllPublicTasksIds = function () {
             if (err) {
                 reject(err);
             } else {
-                let publicTasksIds = rows.map((row) => row.tid);
+                let publicTasksIds = rows.map((row) => parseInt(row.tid));
                 let numberPublicTasksId = rows[0].total_rows;
                 resolve({publicTasksIds, numberPublicTasksId});
             }

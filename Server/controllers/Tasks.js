@@ -13,7 +13,8 @@ module.exports.addTask = function addTask(req, res, next) {
     var owner = req.user;
     Tasks.addTask(task, owner)
         .then(function(response) {
-            utils.writeJson(res, response, 201);
+                utils.writeJson(res, response, 201);
+
         })
         .catch(function(response) {
             utils.writeJson(res, { errors: [{ 'param': 'Server', 'msg': response }], }, 500);

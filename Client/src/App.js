@@ -121,7 +121,7 @@ const Main = () => {
       try {
         var parsedMessage = JSON.parse(messageBroker);
 
-        if (topic != "PublicTasks" && topic != "RecoveryPublicTasks") {
+        if (topic != "PublicTasks" && topic != "RecoveryPublicTasks" && topic != "CompletePublicTasks") {
           
           if (parsedMessage.status == "deleted"){
             client.unsubscribe(topic);
@@ -166,8 +166,10 @@ const Main = () => {
           }
 
           if(topic == "RecoveryPublicTasks"){
-            if(parsedMessage.status == "allPublicTasks"){
+            if(parsedMessage.status == "allInitialPublicTasks"){
+              console.log("Inizial Public Tasks")
               console.log(parsedMessage)
+              
               let totalPublicPage= Math.ceil( parseInt(parsedMessage.number)/constants.OFFSET);
 
               for(const task of parsedMessage.taskList){
@@ -184,10 +186,31 @@ const Main = () => {
               client.unsubscribe("RecoveryPublicTasks")
             }
           }
+          if(topic == "CompletePublicTasks"){
+            if(parsedMessage.status == "allUpdatedPublicTasks"){
+                console.log("Update Public Tasks")
+                console.log(parsedMessage)
+                let totalPublicPage= Math.ceil( parseInt(parsedMessage.number)/constants.OFFSET);
+  
+                for(const task of parsedMessage.taskList){
+                  if(!PublicMap.has(task)){
+                    console.log("RecoveryPublicTasks: ",task)
+                    client.subscribe(String(task), {qos:0, retain:true})
+                  }
+                }
+                localStorage.setItem('totalPublicPages',  String(totalPublicPage));
+                localStorage.setItem('totalPublicItems',  String(parsedMessage.number));
+                console.log("TOTALPUBLICPAGE: ", localStorage.getItem("totalPublicPages"))
+                console.log("TOTALPUBLICITEMS: ", localStorage.getItem("totalPublicItems"))
+                console.log("TERMINE RECOVERY PUB TASKS: ", PublicMap)
+                client.unsubscribe("CompletePublicTasks")
+              }
+            }  
           
-
         }
-      } catch (e) {
+          
+      
+     } catch (e) {
         console.log(e);
       }
     })
@@ -710,6 +733,7 @@ const Main = () => {
       console.log("PublicTasks Topic. RecoveryPublicTasks Topic.")
       client.subscribe("PublicTasks", { qos: 0, retain: false })
       client.subscribe("RecoveryPublicTasks", {qos:0, retain: true})
+      client.subscribe("CompletePublicTasks",{qos:0, retain:true})
 
       localStorage.setItem('totalPublicItems','test');
       localStorage.setItem('totalPublicPages', 'test');
