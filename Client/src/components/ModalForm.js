@@ -81,7 +81,7 @@ const ModalForm = (props) => {
   // Form.Control.Feedback : reports feedback in react-bootstrap style
   // since the modal is added to the page only when needed the show flag can be always true
   return (
-    <Modal show onHide={onClose} animation={false}>
+    <Modal show onHide={()=>onClose()} animation={false}>
       <Modal.Header closeButton>
         <Modal.Title>Add task</Modal.Title>
       </Modal.Header>
