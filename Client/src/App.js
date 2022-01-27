@@ -52,6 +52,7 @@ var host = 'ws://127.0.0.1:8080'
 var client = mqtt.connect(host, options);
 var PublicMap = new Map()
 var OwnTasksMaps = new Map() 
+var UserListGlobal = []
 var temp = []
 var index;
 var TestLista = new Map()
@@ -77,6 +78,8 @@ const Main = () => {
   const [taskList, setTaskList] = useState([]);
   const [OwnedTaskList, setOwnedTaskList] = useState([]);
   const [userList, setUserList] = useState([]);
+  const [oldTasksUser, setOldTasksUser] = useState([])
+  const [oldUsersList, setOldUsersList] = useState([])
   const [onlineList, setOnlineList] = useState([]);
   const [assignedTaskList, setAssignedTaskList] = useState([]);
   const [dirty, setDirty] = useState(true);
@@ -183,6 +186,7 @@ const Main = () => {
               }
               localStorage.setItem('totalPublicPages',  String(totalPublicPage));
               localStorage.setItem('totalPublicItems',  String(parsedMessage.number));
+              client.unsubscribe("GetPublicIdsTasks")
             }
 
           }
@@ -221,6 +225,14 @@ const Main = () => {
 
     }
 
+    client.subscribe("GetPublicIdsTasks", { qos: 0, retain: true })
+    client.subscribe("PublicTasks", { qos: 0, retain: false }) 
+    client.subscribe("TalkWithServer", { qos: 0, retain: false })
+    
+    client.publish("TalkWithServer", JSON.stringify({status:"getPublicTasks"}),{qos:0})
+    client.unsubscribe("TalkWithServer")
+    localStorage.setItem("currentPage", '1')
+
     // check if user is authenticated
     const checkAuth = async () => {
       try {
@@ -229,8 +241,10 @@ const Main = () => {
         if (authenticated) {
           //setUser();
           setLoggedIn(true);
+          client.unsubscribe("GetPublicIdsTasks")
         } else {
           console.log('error');
+          client.unsubscribe("GetPublicIdsTasks")
         }
 
       } catch (err) {
@@ -312,7 +326,7 @@ const Main = () => {
     console.log(messageBroker)
     // funziona: PublicMap.set(parseInt(topic), messageBroker.task)
     
-    if(!messageBroker.task.private){
+    if(messageBroker.status == "updatePublicTask"){
       PublicMap.set(parseInt(topic), messageBroker.task)
       setPubTasks(oldstate => {
         return oldstate.map((item) => {
@@ -572,12 +586,12 @@ const Main = () => {
   }
 
   const getUsers = () => {
-    API.getUsers()
-      .then(users => {
-        setUserList(users);
-      })
-      .catch(e => handleErrors(e));
-  }
+      API.getUsers()
+        .then(users => {
+          setUserList(users);
+        })
+        .catch(e => handleErrors(e));
+    }
 
   const refreshTasks = (filter, page) => {
     
@@ -591,6 +605,7 @@ const Main = () => {
            }
         }
         setTaskList(tasks);
+        setOwnedTaskList(tasks);
         setDirty(false);
       })
       .catch(e => handleErrors(e));
@@ -711,16 +726,13 @@ const Main = () => {
   const doLogIn = async (credentials) => {
     try { 
       const LoggedUser = await API.logIn(credentials);
+      API.getUsers()
+      .then(users => {
+        setUserList(users);
+      })
+      .catch(e => handleErrors(e));
       setUser(LoggedUser);
       setLoggedIn(true);
-      console.log("PublicTasks Topic. RecoveryPublicTasks Topic.")
-      client.subscribe("PublicTasks", { qos: 0, retain: false }) 
-      client.subscribe("TalkWithServer", { qos: 0, retain: false })
-      client.subscribe("GetPublicIdsTasks", { qos: 0, retain: true })
-      client.publish("TalkWithServer", JSON.stringify({status:"riceviIdTaskPubblici"}),{qos:0})
-      client.unsubscribe("TalkWithServer")
-
-
     }
     catch (err) {
       // error is handled and visualized in the login form, do not manage error, throw it
@@ -731,11 +743,10 @@ const Main = () => {
   const handleLogOut = async () => {
     // clean up everything
 
-    for(const [key, val] of PublicMap.entries()){
+    for(const [key, val] of OwnTasksMaps.entries()){
       client.unsubscribe(String(val.id))
       console.log("Unsubscribe of topic: ", val.id)
     }
-    PublicMap.clear()
     OwnTasksMaps.clear()
     TestLista.clear()
     setLoggedIn(false);
@@ -815,7 +826,7 @@ const Main = () => {
                 <MiniOnlineList onlineList={onlineList} />
               </Col>
               <Col sm={8} bg="light" id="left-sidebar" className="collapse d-sm-block below-nav">
-                <Assignments OwnedTaskList={OwnedTaskList} getAllOwnedTasks={getAllOwnedTasks} UserList={userList} getUsers={getUsers} assignTask={assignTask} removeAssignTask={removeAssignTask} />
+                <Assignments  OwnedTaskList={OwnedTaskList} getAllOwnedTasks={getAllOwnedTasks} UserList={userList} getUsers={getUsers} assignTask={assignTask} removeAssignTask={removeAssignTask}/>
               </Col>
             </Row>
             : <Redirect to="/login" />

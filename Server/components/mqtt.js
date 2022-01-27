@@ -25,7 +25,7 @@ var options = {
 var mqtt_connection = mqtt.connect(host, options);
 
 var taskMessageMap = new Map();
-var publicTasksMap = new Map();
+
 
 
 
@@ -65,16 +65,14 @@ mqtt_connection.on('message', function (topic, message) {
   if(topic == "TalkWithServer"){
     console.log("topic", topic)
     console.log("message", parsedMessage)
-    if(parsedMessage.status == "riceviIdTaskPubblici"){
+    if(parsedMessage.status == "getPublicTasks"){
       //console.log("Ho ricevuto comando")
       Tasks.getPublicTasksWithNoLimit().then(function(response){
         response.forEach(function(singleTask){
-          publicTasksMap.set(parseInt(singleTask.id),singleTask)
           mqtt_connection.publish(String(singleTask.id), JSON.stringify(new MQTTTaskMessage("publicInitial", null, null, singleTask)), {qos:0, retain:true})  
     
         })
 
-          console.log(publicTasksMap)
           let tempArray = response.map(x=>x.id).sort((a,b)=> a.id<b.id?-1:1)
           console.log("tempArray: ", tempArray)
           mqtt_connection.publish("GetPublicIdsTasks",JSON.stringify(new MQTTAllPublicTaskMessage("allPublicIdTasks", tempArray.length, tempArray)), {qos:0, retain:true})
@@ -97,20 +95,6 @@ module.exports.publishTaskMessage = function publishTaskMessage(taskId, message,
 
 module.exports.publishPublicTaskMessage = function publishPublicTaskMessage(message) {
   mqtt_connection.publish("PublicTasks", JSON.stringify(message), { qos: 0, retain:false })
-};
-
-module.exports.addPublishPublicTaskMessage = function addPublishPublicTaskMessage(taskId) {
-  
-  publicTasksMap.set(parseInt(taskId))
-  console.log("ADD A TASK: PUBLICKTASKLIST: ", [...publicTasksMap.keys()].sort((a,b)=>a.id<b.id?-1:1), "SIZEPUBLICTASKS: ", [...publicTasksMap.keys()].length)
-  mqtt_connection.publish("GetPublicIdsTasks", JSON.stringify(new MQTTAllPublicTaskMessage("allPublicIdTasks", [...publicTasksMap.keys()].length, [...publicTasksMap.keys()].sort((a,b)=>a.id<b.id?-1:1)), {qos:0, retain:true}))
-};
-
-module.exports.deletePublishPublicTaskMessage = function deletePublishPublicTaskMessage(taskId) {
-  
-  publicTasksMap.delete(parseInt(taskId))
-  console.log("DELETE A TASK: PUBLICKTASKLIST: ", [...publicTasksMap.keys()].sort((a,b)=>a.id<b.id?-1:1), "SIZEPUBLICTASKS: ", [...publicTasksMap.keys()].length)
-  mqtt_connection.publish("GetPublicIdsTasks", JSON.stringify(new MQTTAllPublicTaskMessage("UpdatedPublicTasks", [...publicTasksMap.keys()].length, [...publicTasksMap.keys()].sort((a,b)=>a.id<b.id?-1:1)), {qos:0, retain:true}))
 };
 
 module.exports.saveMessage = function saveMessage(taskId, message) {

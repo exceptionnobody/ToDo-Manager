@@ -30,7 +30,6 @@ exports.addTask = function(task, owner) {
                     console.log("Task Created: ", createdPubTask)
                     let mess2 = new MQTTTaskMessage("public",null,null,createdPubTask)
                     mqtt.publishTaskMessage(this.lastID, mess2, true)
-                    mqtt.addPublishPublicTaskMessage(this.lastID)
                     let mess = new MQTTTaskMessage("insertPublicTask",null,null,createdPubTask)
                     mqtt.publishPublicTaskMessage(new MQTTPublicTaskMessage("createdPubTask", this.lastID));
                     mqtt.publishTaskMessage(this.lastID, mess, false)
@@ -84,7 +83,6 @@ exports.deleteTask = function(taskId, owner) {
                                 reject(err);
                             else{
                                 if(!rows[0].private){
-                                    mqtt.deletePublishPublicTaskMessage(taskId);
                                     mqtt.publishTaskMessage(taskId, new MQTTPublicTaskMessage("deletePubTask"),true)
                                     
                                 }
@@ -451,7 +449,6 @@ exports.updateSingleTask2 = function (task, taskId, owner) {
                                     let message2 = new MQTTTaskMessage("insertPublicTask", owner,rows[0].name, task)
                                     mqtt.publishTaskMessage(taskId, message2, true);
                                     mqtt.publishPublicTaskMessage(message);
-                                    mqtt.addPublishPublicTaskMessage(taskId)
                                     
                                     
                                 }else{ 
@@ -460,7 +457,6 @@ exports.updateSingleTask2 = function (task, taskId, owner) {
                                     // pubblico il nuovo task nel suo topic
                                     message = new MQTTTaskMessage("removeFromPubTasks");
                                     mqtt.publishTaskMessage(taskId, message, true);
-                                    mqtt.deletePublishPublicTaskMessage(taskId);
                                     console.log("DA TASK PUBBLICO A TASK PRIVATO CON ID: ", taskId)
                                     
                                 }
