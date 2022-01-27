@@ -121,7 +121,7 @@ const Main = () => {
       try {
         var parsedMessage = JSON.parse(messageBroker);
 
-        if (topic != "PublicTasks" && topic != "RecoveryPublicTasks" && topic != "CompletePublicTasks") {
+        if (topic != "PublicTasks" && topic != "GetPublicIdsTasks") {
           
           if (parsedMessage.status == "deleted"){
             client.unsubscribe(topic);
@@ -144,8 +144,13 @@ const Main = () => {
           
           if (parsedMessage.status == "public"){
             PublicMap.set(parsedMessage.task.id, parsedMessage.task)
-            client.subscribe(String(parsedMessage.task.id), {qos:0, retain:true})
+            client.subscribe(String(topic), {qos:0, retain:true})
           }
+
+          if (parsedMessage.status == "publicInitial"){
+            PublicMap.set(parsedMessage.task.id, parsedMessage.task)
+          }
+
 
           if (parsedMessage.status == "insertPublicTask"){
             addPublicTask(parsedMessage.task)
@@ -161,56 +166,30 @@ const Main = () => {
 
           if(topic == "PublicTasks"){
             if (parsedMessage.status == "newPubTaskId" || parsedMessage.status == "createdPubTask")
-              client.subscribe(String(parsedMessage.id), { qos: 0, retain: true })
-              console.log("Messaggi PublicTasks: ", parsedMessage)
+              client.subscribe(String(parsedMessage.id), { qos: 0, retain: false })
+              
           }
 
-          if(topic == "RecoveryPublicTasks"){
-            if(parsedMessage.status == "allInitialPublicTasks"){
-              console.log("Inizial Public Tasks")
+          if(topic == "GetPublicIdsTasks"){
+            if(parsedMessage.status == "allPublicIdTasks"){
               console.log(parsedMessage)
-              
               let totalPublicPage= Math.ceil( parseInt(parsedMessage.number)/constants.OFFSET);
 
               for(const task of parsedMessage.taskList){
-                if(!PublicMap.has(task)){
-                  console.log("RecoveryPublicTasks: ",task)
+                if(!PublicMap.has(parseInt(task))){
+                  console.log("GetPublicIdsTasks: ",task)
                   client.subscribe(String(task), {qos:0, retain:true})
                 }
               }
               localStorage.setItem('totalPublicPages',  String(totalPublicPage));
               localStorage.setItem('totalPublicItems',  String(parsedMessage.number));
-              console.log("TOTALPUBLICPAGE: ", localStorage.getItem("totalPublicPages"))
-              console.log("TOTALPUBLICITEMS: ", localStorage.getItem("totalPublicItems"))
-              console.log("TERMINE RECOVERY PUB TASKS: ", PublicMap)
-              client.unsubscribe("RecoveryPublicTasks")
             }
+
           }
-          if(topic == "CompletePublicTasks"){
-            if(parsedMessage.status == "allUpdatedPublicTasks"){
-                console.log("Update Public Tasks")
-                console.log(parsedMessage)
-                let totalPublicPage= Math.ceil( parseInt(parsedMessage.number)/constants.OFFSET);
-  
-                for(const task of parsedMessage.taskList){
-                  if(!PublicMap.has(task)){
-                    console.log("RecoveryPublicTasks: ",task)
-                    client.subscribe(String(task), {qos:0, retain:true})
-                  }
-                }
-                localStorage.setItem('totalPublicPages',  String(totalPublicPage));
-                localStorage.setItem('totalPublicItems',  String(parsedMessage.number));
-                console.log("TOTALPUBLICPAGE: ", localStorage.getItem("totalPublicPages"))
-                console.log("TOTALPUBLICITEMS: ", localStorage.getItem("totalPublicItems"))
-                console.log("TERMINE RECOVERY PUB TASKS: ", PublicMap)
-                client.unsubscribe("CompletePublicTasks")
-              }
-            }  
           
+
         }
-          
-      
-     } catch (e) {
+      } catch (e) {
         console.log(e);
       }
     })
@@ -313,7 +292,7 @@ const Main = () => {
       setPubTasks(temporalState.filter((x,j)=> {if(j>=(pageNumber-1)*constants.OFFSET && j < (pageNumber)*constants.OFFSET) return x}))
     }else{
         let num = Number(localStorage.getItem('currentPage'))
-        if(num !== 1){
+        if(num > 1){
           num-=1
           localStorage.setItem('currentPage', String(num))
           setPubTasks(temporalState.filter((x,j)=> (j>=(num-1)*constants.OFFSET && j < (num)*constants.OFFSET)))
@@ -384,6 +363,10 @@ const Main = () => {
     if (datas.typeMessage == "login") {
 
       if(!TestLista.has(datas.userId)){
+
+      client.publish("TalkWithServer", JSON.stringify({status:"riceviIdTaskPubblici"}),{qos:0})
+      client.unsubscribe("TalkWithServer")
+
         TestLista.set(datas["userId"], datas)
         let test = [...TestLista.values()].sort((a, b) => {
           let fa = a.userName.toLowerCase();
@@ -726,17 +709,17 @@ const Main = () => {
   }
 
   const doLogIn = async (credentials) => {
-    try {
+    try { 
       const LoggedUser = await API.logIn(credentials);
       setUser(LoggedUser);
       setLoggedIn(true);
       console.log("PublicTasks Topic. RecoveryPublicTasks Topic.")
-      client.subscribe("PublicTasks", { qos: 0, retain: false })
-      client.subscribe("RecoveryPublicTasks", {qos:0, retain: true})
-      client.subscribe("CompletePublicTasks",{qos:0, retain:true})
+      client.subscribe("PublicTasks", { qos: 0, retain: false }) 
+      client.subscribe("TalkWithServer", { qos: 0, retain: false })
+      client.subscribe("GetPublicIdsTasks", { qos: 0, retain: true })
+      client.publish("TalkWithServer", JSON.stringify({status:"riceviIdTaskPubblici"}),{qos:0})
+      client.unsubscribe("TalkWithServer")
 
-      localStorage.setItem('totalPublicItems','test');
-      localStorage.setItem('totalPublicPages', 'test');
 
     }
     catch (err) {
@@ -761,8 +744,8 @@ const Main = () => {
     setDirty(true);
     setPubTasks([]);
 
-   client.unsubscribe("PublicTasks")
-    client.unsubscribe("RecoveryPublicTasks")
+    client.unsubscribe("PublicTasks")
+    client.unsubscribe("TalkWithClients")
     await API.logOut()
     localStorage.removeItem('currentPage');
     localStorage.removeItem('totalItems');

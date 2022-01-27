@@ -28,11 +28,13 @@ exports.addTask = function(task, owner) {
                 if(!task.private){
                     let createdPubTask = new Task(this.lastID, task.description, task.important, task.private, task.deadline, task.project, task.completed, task.active);
                     console.log("Task Created: ", createdPubTask)
+                    let mess2 = new MQTTTaskMessage("public",null,null,createdPubTask)
+                    mqtt.publishTaskMessage(this.lastID, mess2, true)
                     mqtt.addPublishPublicTaskMessage(this.lastID)
                     let mess = new MQTTTaskMessage("insertPublicTask",null,null,createdPubTask)
-                    mqtt.publishTaskMessage(this.lastID,mess)
                     mqtt.publishPublicTaskMessage(new MQTTPublicTaskMessage("createdPubTask", this.lastID));
-                    resolve(null);
+                    mqtt.publishTaskMessage(this.lastID, mess, false)
+                    
                    
                  } else{
                 //Creation of a new private task and I sent a MQTT message for the created task
@@ -83,7 +85,7 @@ exports.deleteTask = function(taskId, owner) {
                             else{
                                 if(!rows[0].private){
                                     mqtt.deletePublishPublicTaskMessage(taskId);
-                                    mqtt.publishTaskMessage(taskId, new MQTTPublicTaskMessage("deletePubTask"))
+                                    mqtt.publishTaskMessage(taskId, new MQTTPublicTaskMessage("deletePubTask"),true)
                                     
                                 }
                                     //Delete the private task with the corresponding MQTT message
@@ -128,7 +130,7 @@ exports.getPublicTasks = function(req) {
     });
 }
 
-exports.getPublicTasksWithNoLimit = function(req) {
+module.exports.getPublicTasksWithNoLimit = function getPublicTasksWithNoLimit(req) {
     return new Promise((resolve, reject) => {
 
         let sql = "SELECT t.id as tid, t.description, t.important, t.private, t.project, t.deadline,t.completed,c.total_rows FROM tasks t, (SELECT count(*) total_rows FROM tasks l WHERE l.private=0) c WHERE  t.private = 0 "
@@ -426,7 +428,7 @@ exports.updateSingleTask2 = function (task, taskId, owner) {
                                     // vecchio task pubblico, nuovo task pubblico
                                     // pubblico il nuovo task nel suo topic
                                     message = new MQTTPublicTaskMessage("updatePublicTask", taskId, task);
-                                    mqtt.publishTaskMessage(taskId, message);
+                                    mqtt.publishTaskMessage(taskId, message, true);
                                     //mqtt.publishTaskMessage(taskId, null);
                                 }else if(rows[0].private == 1  && task.private) { 
                                     //row[0].private != 0 && tas.private == false
@@ -447,20 +449,20 @@ exports.updateSingleTask2 = function (task, taskId, owner) {
                                     console.log("TASK DA PRIVATO A PUBBLICO: ", task)
                                     message = new MQTTPublicTaskMessage("newPubTaskId", taskId);
                                     let message2 = new MQTTTaskMessage("insertPublicTask", owner,rows[0].name, task)
+                                    mqtt.publishTaskMessage(taskId, message2, true);
                                     mqtt.publishPublicTaskMessage(message);
                                     mqtt.addPublishPublicTaskMessage(taskId)
-                                    mqtt.publishTaskMessage(taskId, message2);
+                                    
                                     
                                 }else{ 
                                     // row[0].private == 0 && task.private != false
                                     // vecchio task pubblico e nuovo task privato
                                     // pubblico il nuovo task nel suo topic
+                                    message = new MQTTTaskMessage("removeFromPubTasks");
+                                    mqtt.publishTaskMessage(taskId, message, true);
                                     mqtt.deletePublishPublicTaskMessage(taskId);
                                     console.log("DA TASK PUBBLICO A TASK PRIVATO CON ID: ", taskId)
-                                    message = new MQTTTaskMessage("removeFromPubTasks");
-                                    mqtt.publishTaskMessage(taskId, message);
-                                    let empty = {}
-                                    mqtt.publishTaskMessage(taskId, empty);
+                                    
                                 }
                             }
 
@@ -518,7 +520,7 @@ exports.updateSingleTask2 = function (task, taskId, owner) {
 
 
 
-exports.retriveAllPublicTasksIds = function () {
+module.exports.retriveAllPublicTasksIds = function () {
     return new Promise((resolve, reject) => {
 
         var sql = "SELECT t.id as tid, c.total_rows FROM tasks t, (SELECT count(*) total_rows FROM tasks l WHERE l.private=0) c WHERE  t.private = 0 "
@@ -527,7 +529,7 @@ exports.retriveAllPublicTasksIds = function () {
             if (err) {
                 reject(err);
             } else {
-                let publicTasksIds = rows.map((row) => parseInt(row.tid));
+                let publicTasksIds = rows.map((row) => row.tid);
                 let numberPublicTasksId = rows[0].total_rows;
                 resolve({publicTasksIds, numberPublicTasksId});
             }
@@ -557,3 +559,4 @@ const createTask = function(row) {
     const completedTask = (row.completed === 1) ? true : false;
     return new Task(row.tid, row.description, importantTask, privateTask, row.deadline, row.project, completedTask, row.active);
 }
+
