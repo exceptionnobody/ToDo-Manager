@@ -40,7 +40,6 @@ mqtt_connection.on('connect', function () {
   console.log('client connected:' + clientId)
 
   Assignments.getTaskSelections().then(function (selections) {
-    console.log(selections)
     selections.forEach(function(selection){
       var status = (selection.userId) ? "active" : "inactive";
       var message = new MQTTTaskMessage(status, selection.userId, selection.userName);
@@ -66,7 +65,6 @@ mqtt_connection.on('message', function (topic, message) {
     console.log("topic", topic)
     console.log("message", parsedMessage)
     if(parsedMessage.status == "getPublicTasks"){
-      //console.log("Ho ricevuto comando")
       Tasks.getPublicTasksWithNoLimit().then(function(response){
         response.forEach(function(singleTask){
           mqtt_connection.publish(String(singleTask.id), JSON.stringify(new MQTTTaskMessage("publicInitial", null, null, singleTask)), {qos:0, retain:true})  
