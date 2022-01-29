@@ -13,7 +13,7 @@
     "status": {
       "type": "string",
       "description": "current condition of the task (the available types are active if it is selected by a user, inactive if it is not selected by any user, or deleted if it has been removed from the service)",
-      "enum": ["active", "inactive", "deleted"]
+      "enum": ["active", "inactive", "deleted", "insert", "update"] 
     },
     "userId": {
       "type": "integer",

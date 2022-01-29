@@ -35,7 +35,10 @@ exports.assignTaskToUser = function(userId,taskId,owner) {
                 const sql2 = 'INSERT INTO assignments(task, user) VALUES(?,?)';
                 db.run(sql2, [taskId, userId], function(err) {
                     if (err) {
-                        reject(err);
+                        if(err.message.includes("SQLITE_CONSTRAINT: UNIQUE constraint failed"))
+                          reject(409);
+                        else
+                            reject(err)
                     } else {
                         resolve(null);
                     }

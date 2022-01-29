@@ -114,6 +114,9 @@ paths:
         '400':
           description: Bad Request
           content: {}
+        '204':
+          description: Success. No content
+          content: {}
         '401':
           description: Unauthorized
           content: {}

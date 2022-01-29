@@ -1,0 +1,30 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id" : "http://www.my-schema.com/mqtt_message_schema.json",
+    "title": "MQTT Message",
+    "description": "JSON Schema for MQTT Message",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "$schema": {
+        "type": "string",
+        "description": "path to the JSON Schema to use for the validation of the JSON file describing the MQTT Message"
+      },
+      "type": {
+        "type": "string",
+        "description": "type of operation",
+        "enum": ["subscribe"]
+      },
+      "id": {
+        "type": "integer",
+        "description": "identified of the task"
+      },
+      "task": {
+         "$ref": "./task_schema.json",
+        "description": "public task"
+      }
+    },
+    "required": ["type"]
+    
+  }
+  

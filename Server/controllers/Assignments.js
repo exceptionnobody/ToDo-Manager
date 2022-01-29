@@ -24,7 +24,9 @@ module.exports.assignTaskToUser = function assignTaskToUser (req, res, next) {
       }
       else if (response == 404){
           utils.writeJson(res, { errors: [{ 'param': 'Server', 'msg': 'The task does not exist.' }], }, 404);
-      }
+      }else if (response == 409){
+        utils.writeJson(res, { errors: [{ 'param': 'Server', 'msg': "Task alread assigned to the user " }], }, 409);
+      } 
       else {
           utils.writeJson(res, {errors: [{ 'param': 'Server', 'msg': response }],}, 500);
       }

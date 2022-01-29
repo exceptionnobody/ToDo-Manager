@@ -1,10 +1,10 @@
-class MQTTPublicTaskMessage {    
-    constructor(status, id, task) {
+class MQTTForPublicChannel {    
+    constructor(type, id, task) {
 
-        this.status = status;
+        this.type = type;
         if(id) this.id = id;
         if(task) this.task = task;
     }
 }
 // FORMATO PER TUTTI I MESSAGGI RELATIVI AI TASK PUBBLICI
-module.exports = MQTTPublicTaskMessage;
+module.exports = MQTTForPublicChannel;

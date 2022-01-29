@@ -1,0 +1,33 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id" : "http://www.my-schema.com/mqtt_all_public_id_message_schema.json",
+    "title": "MQTT Message",
+    "description": "JSON Schema for MQTT Message",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "$schema": {
+        "type": "string",
+        "description": "path to the JSON Schema to use for the validation of the JSON file describing the MQTT Message"
+      },
+      "type": {
+        "type": "string",
+        "description": "",
+        "const": "allPublicIdTasks"
+      },
+      "number": {
+        "type": "integer",
+        "description": "the actual number of public tasks"
+      },
+      "taskList": {
+        "type": "array",
+        "description": "list of the ids of the public tasks",
+        "items": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "required": ["type","number","taskList"]
+  }
+  
