@@ -36,7 +36,7 @@ exports.addTask = function(task, owner) {
                    
                  } else{
                 //Creation of a new private task and I sent a MQTT message for the created task
-                var message = new MQTTTaskMessage("inactive", null, null, null);
+                var message = new MQTTTaskMessage("inactive");
                 mqtt.saveMessage(this.lastID, message);
                 mqtt.publishTaskMessage(this.lastID, message);
 

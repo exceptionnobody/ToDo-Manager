@@ -22,17 +22,54 @@
     "userName": {
       "type": "string",
       "description": "name of the user"
+    },
+    "task":{
+      "$ref":"./task_schema.json",
+      "description": "task"
     }
   },
   "required": ["status"],
-  "allOf": [
+  "anyOf": [
     {
       "if": {
-        "properties": { "typeMessage": { "const": "active" } }
+        "properties": { "status": { "const": "active" } }
       },
       "then": {
         "required": ["userId", "userName"]
       }
-    }
+
+    },{
+      "if":{
+        "properties": {"status": {"const": "insert"}}
+      },
+      "then":{
+        "required": ["status", "task"]
+      }
+    },
+      {
+      "if":{
+        "propertis":{ "status": {"const": "deleted"}}
+      },
+      "then":{
+        "required": ["status"]
+      }
+      },
+      {
+     "if": {
+       "properties": {"status": {"const": "inactive"}}
+     },
+     "then":{
+       "required": ["status"]
+     }   
+      },
+      {
+        "if":{
+          "properties":{"status":{"const": "update"}}
+        },
+        "then":{
+          "required":["status", "task"]
+        }
+      }
+        
   ]
 }

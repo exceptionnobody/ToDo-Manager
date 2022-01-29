@@ -1,7 +1,4 @@
-Topic: RecoveryPublicTasks
-Scopo: canale dedicato a mandare gli indici dei task pubblici aggiornati quando un client si connette al server; Mando questi indici al broker
-Retain: true, così più client connessi nello stesso istante o poco dopo pochi attimi riceveranno gli indici dei tasks pubblici aggiornati a cui 
-si iscriveranno
+MQTTForPublicChannel è usato per il canale PublicTasks
 
 Topic: PublicTasks
 Scopi: 1) ricevere i task che vengono aggiornati da privati a pubblici
