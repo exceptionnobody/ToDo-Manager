@@ -1,8 +1,8 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "$id" : "http://www.my-schema.com/mqtt_all_public_id_message_schema.json",
-    "title": "MQTT Message",
-    "description": "JSON Schema for MQTT Message",
+    "title": "MQTT CarryPublicIds Message",
+    "description": "JSON Schema for MQTT Message for the topic: CarryPublicIds",
     "type": "object",
     "additionalProperties": false,
     "properties": {
@@ -12,11 +12,12 @@
       },
       "type": {
         "type": "string",
-        "description": "",
-        "const": "allPublicIdTasks"
+        "description": "get all ids of the public tasks",
+        "const": "lastPublicIds"
       },
       "number": {
         "type": "integer",
+        "minimum": 0,
         "description": "the actual number of public tasks"
       },
       "taskList": {

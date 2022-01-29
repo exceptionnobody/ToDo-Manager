@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id" : "http://www.my-schema.com/mqtt_message_schema.json",
-  "title": "MQTT Message",
-  "description": "JSON Schema for MQTT Message",
+  "title": "MQTT Message for single tasks",
+  "description": "JSON Schema for MQTT Message, for triggering operations into clients",
   "type": "object",
   "additionalProperties": false,
   "properties": {

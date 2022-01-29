@@ -7,11 +7,15 @@ var MQTTTaskMessage = require('./mqtt_task_message.js');
 var MQTTAllPublicIdTasksMessage = require('./mqtt_all_public_id_tasks');
 
 // TEST
+var message;
 var fs = require("fs");
 var path = require('path');
 const Ajv = require("ajv")
 const ajv = new Ajv({allErrors: true})
-var mqttAllPublicIdTasksSchema = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../json_schemas/mqtt_all_pubblic_id_tasks.json')).toString());
+var mqttForPublicIdTasksSchema = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../json_schemas/mqtt_for_CarryPublicIds_message_schema.json')).toString());
+var tasks = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../json_schemas/task_schema.json')).toString());
+var user = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../json_schemas/user_schema.json')).toString());
+
 
 var host = 'ws://localhost:8080';
 var clientId = 'mqttjs_server' + Math.random().toString(16).substr(2, 8);
@@ -33,7 +37,9 @@ var mqtt_connection = mqtt.connect(host, options);
 
 var taskMessageMap = new Map();
 
-const validate = ajv.compile(mqttAllPublicIdTasksSchema) 
+const validateTask = ajv.addSchema(user).compile(tasks)
+const validatePublicMessage = ajv.compile(mqttForPublicIdTasksSchema)
+console.log(validateTask({description:"trallaleru"}))
 
 
 mqtt_connection.on('error', function (err) {
@@ -51,7 +57,7 @@ mqtt_connection.on('connect', function () {
       var status = (selection.userId) ? "active" : "inactive";
       var message = new MQTTTaskMessage(status, selection.userId, selection.userName);
       taskMessageMap.set(selection.taskId, message);
-
+      console.log(selection)
       mqtt_connection.publish(String(selection.taskId), JSON.stringify(message), {qos:0});
       
     });
@@ -71,26 +77,30 @@ mqtt_connection.on('close', function () {
 mqtt_connection.on('message', function (topic, message) {
   var parsedMessage = JSON.parse(message);
   if(topic == "TalkWithServer"){
-    console.log("topic", topic)
-    console.log("message", parsedMessage)
-    if(parsedMessage.status == "getPublicTasks"){
-      Tasks.getPublicTasksWithNoLimit().then(function(response){
+    if(parsedMessage.operation == "getPublicIds"){
+      Tasks.internalGetPublicTasks().then(function(response){
         response.forEach(function(singleTask){
-          //mqtt_connection.publish(String(singleTask.id), JSON.stringify(new MQTTTaskMessage("publicInitial", null, null, singleTask)), {qos:0, retain:true})  
+          const tempValid = validateTask(singleTask)
+          
+          if (tempValid) 
+              console.log("Valid To send!")
+          else 
+              console.log("Invalid: " + ajv.errorsText(validateTask.errors))
+          
           mqtt_connection.publish(String(singleTask.id), JSON.stringify(new MQTTTaskMessage("insert", null, null, singleTask)), {qos:0, retain:true})
         })
 
           let tempArray = response.map(x=>x.id).sort((a,b)=> a.id<b.id?-1:1)
-          console.log("tempArray: ", tempArray)
-          var message = new MQTTAllPublicIdTasksMessage("allPublicIdTasks", tempArray.length, tempArray)
-          const valid = validate(message)
-          if (valid) console.log("Valid To send!")
-          else console.log("Invalid: " + ajv.errorsText(validate.errors))
-  
-          mqtt_connection.publish("GetPublicIdsTasks",JSON.stringify(message), {qos:0, retain:true})
+          message = new MQTTAllPublicIdTasksMessage("lastPublicIds", tempArray.length, tempArray)
+          const valid = validatePublicMessage(message)
          
-    
-    
+         if (valid)
+            console.log("Valid Public Message To send!")
+         else 
+            console.log("Invalid: " + ajv.errorsText(validatePublicMessage.errors))
+  
+          mqtt_connection.publish("CarryPublicIds",JSON.stringify(message), {qos:0, retain:true})
+            
       })
     }
 

@@ -26,7 +26,7 @@ exports.addTask = function(task, owner) {
                 reject(err);
             } else {
                 if(!task.private){
-                    let createdPubTask = new Task(this.lastID, task.description, task.important, task.private, task.deadline, task.project, task.completed, task.active);
+                    let createdPubTask = new Task(this.lastID, task.description, task.important, task.private, task.deadline, task.project, task.completed);
                     console.log("Task Created: ", createdPubTask)
                     let mess = new MQTTTaskMessage("insert",null,null,createdPubTask)
                     mqtt.publishTaskMessage(this.lastID, mess, true)
@@ -123,12 +123,11 @@ exports.getPublicTasks = function(req) {
     });
 }
 
-module.exports.getPublicTasksWithNoLimit = function getPublicTasksWithNoLimit(req) {
+module.exports.internalGetPublicTasks = function internalGetPublicTasks(req) {
     return new Promise((resolve, reject) => {
 
-        let sql = "SELECT t.id as tid, t.description, t.important, t.private, t.project, t.deadline,t.completed,c.total_rows FROM tasks t, (SELECT count(*) total_rows FROM tasks l WHERE l.private=0) c WHERE  t.private = 0 "
-        //let limits = getPagination(req);
-        //if (limits.length != 0) sql = sql + " LIMIT ?,?";
+        let sql = "SELECT t.id as tid, t.description, t.important, t.private, t.project, t.deadline,t.completed FROM tasks t WHERE  t.private = 0 "
+        
         db.all(sql, [], (err, rows) => {
             if (err) {
                 reject(err);
@@ -508,26 +507,6 @@ exports.updateSingleTask2 = function (task, taskId, owner) {
     });
 }
 
-
-
-module.exports.retriveAllPublicTasksIds = function () {
-    return new Promise((resolve, reject) => {
-
-        var sql = "SELECT t.id as tid, c.total_rows FROM tasks t, (SELECT count(*) total_rows FROM tasks l WHERE l.private=0) c WHERE  t.private = 0 "
-       
-        db.all(sql, [], (err, rows) => {
-            if (err) {
-                reject(err);
-            } else {
-                let publicTasksIds = rows.map((row) => row.tid);
-                let numberPublicTasksId = rows[0].total_rows;
-                resolve({publicTasksIds, numberPublicTasksId});
-            }
-        });
-    });
-}
-
-
 /**
  * Utility functions
  */
@@ -548,5 +527,6 @@ const createTask = function(row) {
     const privateTask = (row.private === 1) ? true : false;
     const completedTask = (row.completed === 1) ? true : false;
     return new Task(row.tid, row.description, importantTask, privateTask, row.deadline, row.project, completedTask, row.active);
-}
+   
+    }
 

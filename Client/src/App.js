@@ -124,7 +124,7 @@ const Main = () => {
       try {
         var parsedMessage = JSON.parse(messageBroker);
 
-        if (topic != "PublicTasks" && topic != "GetPublicIdsTasks") {
+        if (topic != "PublicTasks" && topic != "CarryPublicIds") {
           
           if (parsedMessage.status == "deleted" || parsedMessage.status == "changed"){
             removeOrDeletePublicTasks(topic, parsedMessage)
@@ -162,20 +162,20 @@ const Main = () => {
               
           }
 
-          if(topic == "GetPublicIdsTasks"){
-            if(parsedMessage.type == "allPublicIdTasks"){
+          if(topic == "CarryPublicIds"){
+            if(parsedMessage.type == "lastPublicIds"){
               totalPublicPages= Math.ceil( parseInt(parsedMessage.number)/constants.OFFSET);
 
               for(const task of parsedMessage.taskList){
                 if(!PublicMap.has(parseInt(task))){
-                  console.log("GetPublicIdsTasks: ",task)
+                  console.log("CarryPublicIds: ",task)
                   client.subscribe(String(task), {qos:0, retain:true})
                 }
               }
               localStorage.setItem('totalPublicPages',  String(totalPublicPages));
               localStorage.setItem('totalPublicItems',  String(parsedMessage.number));
               localStorage.setItem("currentPublicPage", '1');
-              client.unsubscribe("GetPublicIdsTasks")
+              client.unsubscribe("CarryPublicIds")
             }
 
           }
@@ -214,11 +214,11 @@ const Main = () => {
 
     }
 
-    client.subscribe("GetPublicIdsTasks", { qos: 0, retain: true })
+    client.subscribe("CarryPublicIds", { qos: 0, retain: true })
     client.subscribe("PublicTasks", { qos: 0, retain: false }) 
     client.subscribe("TalkWithServer", { qos: 0, retain: false })
-    
-    client.publish("TalkWithServer", JSON.stringify({status:"getPublicTasks"}),{qos:0})
+    //CarryPublicIds
+    client.publish("TalkWithServer", JSON.stringify({operation:"getPublicIds"}),{qos:0})
     client.unsubscribe("TalkWithServer")
     localStorage.setItem("currentPublicPage", '1')
 

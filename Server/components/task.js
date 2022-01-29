@@ -14,6 +14,7 @@ class Task{
           
         
         this.completed = completed || false;
+        
         this.active = active ? true:false;
 
         var selfLink = "/api/tasks/" + this.id;

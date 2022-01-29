@@ -1,8 +1,8 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "$id" : "http://www.my-schema.com/mqtt_message_schema.json",
-    "title": "MQTT Message",
-    "description": "JSON Schema for MQTT Message",
+    "$id" : "http://www.my-schema.com/mqtt_for_PublicTasks_message_schema",
+    "title": "MQTT PublicTasks Message",
+    "description": "JSON Schema for MQTT Message for the topic: PublicTasks",
     "type": "object",
     "additionalProperties": false,
     "properties": {
@@ -13,10 +13,11 @@
       "type": {
         "type": "string",
         "description": "type of operation",
-        "enum": ["subscribe"]
+        "const":"subscribe"
       },
       "id": {
         "type": "integer",
+        "minimum": 0,
         "description": "identified of the task"
       },
       "task": {
@@ -24,7 +25,14 @@
         "description": "public task"
       }
     },
-    "required": ["type"]
-    
+    "required": ["type"],
+    "anyOf": [{
+      "if":{
+        "properties": {"type":{"const":"subscribe"}}
+      },
+      "then":{
+        "required": ["type", "id"]
+      }
+    }]
   }
   

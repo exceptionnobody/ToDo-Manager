@@ -54,6 +54,9 @@
           "$ref": "./user_schema.json#"
       }
     },
+    "active":{
+      "type":"boolean"
+    },
     "self": {
       "type": "string",
       "format": "uri-reference",
