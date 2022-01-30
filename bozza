@@ -1,4 +1,16 @@
 MQTTForPublicChannel è usato per il canale PublicTasks
 
-Topic: PublicTasks
-Scopi: 1) ricevere i task che vengono aggiornati da privati a pubblici
+
+Topic: PublicChannel 
+Description: it carries information about updating of the status of the tasks, in particular
+             regarding the updating of a task from private to public and about the creation of
+             a public task.
+
+Client QoS when it subscribes: 0 
+Server QoS when the server publishes messages: 0
+
+Client retain: false
+Server retain: false
+
+Topic: CarryPublicIds
+Description: it carries all the public ids of the tasks in the moment of the client connection

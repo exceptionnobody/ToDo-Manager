@@ -16,7 +16,7 @@ import { LoginForm } from './components/Login';
 import Assignments from './components/Assignments';
 import OnlineList from './components/OnlineList';
 import MiniOnlineList from './components/MiniOnlineList';
-
+import ReconnectingWebSocket from 'reconnecting-websocket'
 import { Route, useRouteMatch, useHistory, Switch, Redirect, BrowserRouter as Router } from 'react-router-dom';
 
 
@@ -41,7 +41,7 @@ var options = {
   reconnectPeriod: 1000,
   connectTimeout: 30 * 1000,
   will: {
-    topic: 'WillMsg',
+    topic: 'ErrorHandling',
     payload: 'Connection Closed abnormally..!',
     qos: 0,
     retain: false
@@ -57,11 +57,12 @@ var index;
 var TestLista = new Map()
 var totalPublicPages;
 var totalPublicItems;
-
+var numOfConnection = 1;
 
 var constants = Object.freeze({
   OFFSET: 10,
 });
+
 
 const App = () => {
 
@@ -97,6 +98,8 @@ const Main = () => {
   const match = useRouteMatch('/list/:filter');
   const activeFilter = (match && match.params && match.params.filter) ? match.params.filter : 'owned';
 
+  const [errorType, setErrorType] = useState({type:'', msg:''})
+
   const history = useHistory();
   // if another filter is selected, redirect to a new view/url
   const handleSelectFilter = (filter) => {
@@ -104,6 +107,78 @@ const Main = () => {
   }
 
 
+  function forManagingWebSocketConnection(){
+
+    var socket = new ReconnectingWebSocket(url, null, {debug: true, maxReconnectionDelay: 3000, maxRetries:25, connectionTimeout:7000});
+
+    socket.reconnect(400,"test");
+
+    socket.addEventListener('open', () => {
+      alert('hello!');
+    });
+
+    socket.addEventListener('message', function (event) {
+      console.log('Message from server ', event.data);
+      try {
+        messageReceived(event);
+      } catch (error) {
+        console.log(error);
+      }
+      
+  });
+
+  socket.addEventListener('close', (event) => {
+    console.log('The connection has been closed successfully.');
+  });
+  socket.addEventListener('error', function (event) {
+    console.log('WebSocket error: ', event);
+  });
+  }
+
+  function initSocket() {
+    ws = new WebSocket(url);
+  
+    ws.onopen = () => {
+        console.log('connected');
+        //retries=0;
+    };
+  
+    ws.onclose = () => {
+        /*console.error('disconnected.');
+        retries++;
+        if (retries<5) {
+            console.log('trying to reconnect');
+            setTimeout(initSocket, 1000);
+        }
+        else {
+            console.log('Maximum number of reconnect reached');
+            disconnectedMode();
+        }*/
+        console.log("I am trying to use ReconnectWebsocket")
+        forManagingWebSocketConnection()
+    };
+  
+    ws.onerror = error => {
+        console.error('failed to connect or other error.', error);
+        ws.close();
+    };
+  
+    ws.onmessage = (e) => {
+      try {
+        messageReceived(e);
+      } catch (error) {
+        console.log(error);
+      }
+  
+    }
+  
+  }
+  
+  
+  function disconnectedMode () {
+    console.error('disconnected mode.');
+    alert("You are in disconnected mode. Reload page to retry.");
+  }
 
   useEffect(() => {
 
@@ -112,70 +187,104 @@ const Main = () => {
 
     client.on('error', function (err) {
       console.log(err)
+      console.log("Sono nell'errore... ")
       client.end()
     })
 
     client.on('connect', function () {
       console.log('client connected:' + clientId)
+      if(numOfConnection == 1){
+        // all ok
+        client.publish("ServerChannel", JSON.stringify({operation:"getPublicIds"}),{qos:2, retain:true})
+        client.subscribe("CarryPublicIds", { qos: 2, retain: true })
+        localStorage.setItem("currentPublicPage", '1')
+      }else{
+        // I must invalidate what I had
+        // First: I must unsubscribe all old public tasks that I had
+        for(const elem of PublicMap.values())
+          client.unsubscribe(String(elem.id))
+        // Second: I have to clean the map od public tasks
+        PublicMap.clear();
+        setPubTasks([])
+        // then I can perform the same operations
+        client.publish("ServerChannel", JSON.stringify({operation:"getPublicIds"}),{qos:2, retain:true})
+        client.subscribe("CarryPublicIds", { qos: 2, retain: false })
+        
+        localStorage.setItem("currentPublicPage", '1')
+        console.log("RICOOOOONNESSIONEEEEEE")
+
+        if(loggedIn){
+          // If I am logged in, I must invalidate my tasks 
+          for(const elem of OwnTasksMaps.values())
+            client.unsubscribe(String(elem.id))
+
+          OwnTasksMaps.clear()
+
+          refreshTasks(activeFilter, 1)
+        }
+
+      }
     })
 
+    client.on('reconnect', function () {
+      console.log('Reconnecting...')
+    })
 
     client.on('message', function (topic, messageBroker) {
       try {
+        console.log("MESSAGEBROKER: ",JSON.parse(messageBroker))
         var parsedMessage = JSON.parse(messageBroker);
 
-        if (topic != "PublicTasks" && topic != "CarryPublicIds") {
+        if (topic != "PublicChannel" && topic != "CarryPublicIds") {
           
           if (parsedMessage.status == "deleted" || parsedMessage.status == "changed"){
             removeOrDeletePublicTasks(topic, parsedMessage)
-            displayTaskSelection(topic, parsedMessage);
+            if(loggedIn)
+              displayTaskSelection(topic, parsedMessage);
           }
           
           if (parsedMessage.status == "active" || parsedMessage.status == "inactive")
+            if(loggedIn)
              displayTaskSelection(topic, parsedMessage);
           
 
           if (parsedMessage.status == "update"){
             aggiornaTasks(topic, parsedMessage);
-            displayTaskSelection(topic, parsedMessage);
+            if(loggedIn)
+              displayTaskSelection(topic, parsedMessage);
           }
           
-          if (parsedMessage.status == "publicInitial"){
-            PublicMap.set(parsedMessage.task.id, parsedMessage.task)
-          }
-
-
           if (parsedMessage.status == "insert"){
             addPublicTask(parsedMessage.task)
-            displayTaskSelection(topic, parsedMessage.task);
+            if(loggedIn)  
+              displayTaskSelection(topic, parsedMessage.task)
 
           }
 
         } else {
 
           // gestione dei canali 
-          // Topic: PublicTasks per aggiornamenti di task da privati a pubblici e creazioni di tasks pubblici
 
-          if(topic == "PublicTasks"){
-            if (parsedMessage.type == "subscribe")
-              client.subscribe(String(parsedMessage.id), { qos: 0, retain: true })
-              
+          if(topic == "PublicChannel"){
+            if (parsedMessage.type == "subscribe"){
+              client.subscribe(String(parsedMessage.id), { qos: 1, retain: true })
+            }
           }
 
           if(topic == "CarryPublicIds"){
             if(parsedMessage.type == "lastPublicIds"){
+              client.unsubscribe("CarryPublicIds")
               totalPublicPages= Math.ceil( parseInt(parsedMessage.number)/constants.OFFSET);
 
-              for(const task of parsedMessage.taskList){
-                if(!PublicMap.has(parseInt(task))){
-                  console.log("CarryPublicIds: ",task)
-                  client.subscribe(String(task), {qos:0, retain:true})
-                }
-              }
+              for(const task of parsedMessage.taskList)
+                if(!PublicMap.has(parseInt(task)))
+                  client.subscribe(String(task), {qos:1, retain:true})
+
               localStorage.setItem('totalPublicPages',  String(totalPublicPages));
               localStorage.setItem('totalPublicItems',  String(parsedMessage.number));
               localStorage.setItem("currentPublicPage", '1');
-              client.unsubscribe("CarryPublicIds")
+              client.subscribe("PublicChannel", { qos: 1, retain: false }) 
+
             }
 
           }
@@ -188,7 +297,10 @@ const Main = () => {
     })
 
     client.on('close', function () {
+      //alert("Error: Broker not reachable")
+      setErrorType()
       console.log(clientId + ' disconnected');
+      numOfConnection+=1;
     })
 
 
@@ -203,8 +315,14 @@ const Main = () => {
     }
 
     ws.onclose = function (event) {
-      console.log('The connection has been closed successfully.');
+     // numOfConnection+=1;
+
+      alert('(WebSocket)Server not reachable, public tasks not update! We are trying to reconnect... wait.');
+
+      setTimeout(initSocket, 1000);
+
     };
+
     ws.onmessage = (e) => {
       try {
         messageReceived(e);
@@ -213,14 +331,6 @@ const Main = () => {
       }
 
     }
-
-    client.subscribe("CarryPublicIds", { qos: 0, retain: true })
-    client.subscribe("PublicTasks", { qos: 0, retain: false }) 
-    client.subscribe("TalkWithServer", { qos: 0, retain: false })
-    //CarryPublicIds
-    client.publish("TalkWithServer", JSON.stringify({operation:"getPublicIds"}),{qos:0})
-    client.unsubscribe("TalkWithServer")
-    localStorage.setItem("currentPublicPage", '1')
 
     // check if user is authenticated
     const checkAuth = async () => {
@@ -342,10 +452,9 @@ const Main = () => {
   const displayTaskSelection = (topic, parsedMessage) => {
     handler.emit(topic, parsedMessage);
 
-    index = temp.findIndex(x => x.taskId == parseInt(topic));
+    index = temp.findIndex(x => parseInt(x.taskId) == parseInt(topic));
     let objectStatus = { taskId: topic, userName: parsedMessage.userName, status: parsedMessage.status };
-    console.log("Topic: ", topic, " Index: ", index, " ParsedMessage: ", parsedMessage)
-    console.log(temp)
+
     if(index === -1){
       temp.push(objectStatus)
       setAssignedTaskList(temp)
@@ -354,18 +463,14 @@ const Main = () => {
         setAssignedTaskList(temp)
     }
     setDirty(true);
-    console.log(temp)
   }
 
- const messageReceived = function(e) {
-    let datas = JSON.parse(e.data.toString());
+ const messageReceived = function(event) {
+    let datas = JSON.parse(event.data.toString());
     console.log("DATAS: ",datas)
     if (datas.typeMessage == "login") {
 
       if(!TestLista.has(datas.userId)){
-
-      client.publish("TalkWithServer", JSON.stringify({status:"riceviIdTaskPubblici"}),{qos:0})
-      client.unsubscribe("TalkWithServer")
 
         TestLista.set(datas["userId"], datas)
         let test = [...TestLista.values()].sort((a, b) => {
@@ -488,7 +593,6 @@ const Main = () => {
   const getPublicTasks = () => {
      
     let newTempArray = [...PublicMap.values()].sort((a,b)=>a.id<b.id?-1:1)
-    console.log(newTempArray)
     totalPublicPages= Math.ceil(newTempArray.length / constants.OFFSET);
     localStorage.setItem("totalPublicPages",String(totalPublicPages));
     localStorage.setItem("totalPublicItems", String(newTempArray.length))

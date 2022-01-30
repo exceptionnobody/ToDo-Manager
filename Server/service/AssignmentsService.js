@@ -247,7 +247,7 @@ exports.selectTask = function selectTask(userId, taskId) {
  */
  exports.getTaskSelections = function getTaskSelections() {
     return new Promise((resolve, reject) => {
-        const sql = "SELECT t.id as taskId, u.id as userId, u.name as userName FROM tasks as t LEFT JOIN assignments as a ON t.id = a.task AND active = 1 LEFT JOIN users u ON u.id = a.user";
+        const sql = "SELECT t.id as taskId, t.private, u.id as userId, u.name as userName FROM tasks as t LEFT JOIN assignments as a ON t.id = a.task AND active = 1 LEFT JOIN users u ON u.id = a.user";
         db.all(sql, (err, rows) => {
             if (err) {
                 reject(err);

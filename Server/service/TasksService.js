@@ -27,12 +27,14 @@ exports.addTask = function(task, owner) {
             } else {
                 if(!task.private){
                     let createdPubTask = new Task(this.lastID, task.description, task.important, task.private, task.deadline, task.project, task.completed);
-                    console.log("Task Created: ", createdPubTask)
-                    let mess = new MQTTTaskMessage("insert",null,null,createdPubTask)
-                    mqtt.publishTaskMessage(this.lastID, mess, true)
-                    mqtt.publishPublicTaskMessage(new MQTTForPublicChannel("subscribe", this.lastID));
-                    
-                    resolve(null);
+
+                console.log("Task Created: ", createdPubTask)
+                let mess = new MQTTTaskMessage("insert",null,null,createdPubTask)
+                mqtt.publishTaskMessage(String(this.lastID), mess, true)
+                mess = new MQTTForPublicChannel("subscribe", parseInt(this.lastID))
+                console.log("MESS:", mess)
+                mqtt.sendPublicChannel(mess);
+                    resolve({});
                    
                  } else{
                 //Creation of a new private task and I sent a MQTT message for the created task
@@ -243,7 +245,7 @@ exports.getSingleTask = function(taskId,owner) {
  **/
 exports.getAssignedTasks = function(req) {
     return new Promise((resolve, reject) => {
-        var sql =  "SELECT t.id as tid, t.description, t.important, t.private, t.project, t.deadline,t.completed,a.active, u.id as uid, u.name, u.email FROM tasks as t, users as u, assignments as a WHERE t.id = a.task AND a.user = u.id AND u.id = ?";
+        var sql =  "SELECT t.id as tid, t.description, t.important, t.private, t.project, t.deadline,t.completed, a.active, u.id as uid, u.name, u.email FROM tasks as t, users as u, assignments as a WHERE t.id = a.task AND a.user = u.id AND u.id = ?";
         var limits = getPagination(req);
         if (limits.length != 0) sql = sql + " LIMIT ?,?";
         limits.unshift(req.user);
@@ -436,12 +438,11 @@ exports.updateSingleTask2 = function (task, taskId, owner) {
                                     */
                                 }else if(rows[0].private==1  && !task.private ){
                                     //row[0].private != 0 && tas.private == false
-                                    // vecchio task privato, nuovo task pubblico
-                                    // pubblico il nuovo task nel topic PublicTasks
+                                    // old task private, new task is public
                                     message = new MQTTForPublicChannel("subscribe", taskId);
                                     let message2 = new MQTTTaskMessage("insert", null, null, task)
                                     mqtt.publishTaskMessage(taskId, message2, true);
-                                    mqtt.publishPublicTaskMessage(message);
+                                    mqtt.sendPublicChannel(message);
                                     
                                     
                                 }else{ 

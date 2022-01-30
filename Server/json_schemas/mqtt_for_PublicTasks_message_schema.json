@@ -33,6 +33,14 @@
       "then":{
         "required": ["type", "id"]
       }
+    },
+    {
+      "if":{
+        "properties": {"type":{"const":"subscribe"}}
+      },
+      "then":{
+        "required": ["type", "id", "task"]
+      }
     }]
   }
   

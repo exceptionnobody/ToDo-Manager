@@ -55,7 +55,8 @@ passport.use(new JwtStrategy(opts, function(jwt_payload, done) {
 
 app.post('/api/users/authenticator', userController.authenticateUser);
 app.get('/api/tasks/public', taskController.getPublicTasks);
-app.post('/api/tasks', passport.authenticate('jwt', { session: false }), validate({ body: taskSchema }), taskController.addTask);
+//validate({ body: taskSchema }) da mettere nella post sotto
+app.post('/api/tasks', passport.authenticate('jwt', { session: false }), taskController.addTask);
 app.get('/api/tasks/:taskId', passport.authenticate('jwt', { session: false }), taskController.getSingleTask);
 app.delete('/api/tasks/:taskId', passport.authenticate('jwt', { session: false }), taskController.deleteTask);
 app.put('/api/tasks/:taskId', passport.authenticate('jwt', { session: false }), validate({ body: taskSchema }), taskController.updateSingleTask);

@@ -23,11 +23,11 @@ var options = {
   keepalive: 30,
   clientId: clientId,
   clean: true,
-  reconnectPeriod: 60000,
-  connectTimeout: 30*1000,
+  reconnectPeriod: 5000, //1000 milliseconds, interval between two reconnections. Disable auto reconnect by setting to 0
+  connectTimeout: 30*1000, //30 * 1000 milliseconds, time to wait before a CONNACK is received
   will: {
-    topic: 'WillMsg',
-    payload: 'Connection Closed abnormally..!',
+    topic: 'ErrorHandling',
+    payload: 'ServerDisconnection',
     qos: 0,
     retain: false
   },
@@ -44,7 +44,8 @@ console.log(validateTask({description:"trallaleru"}))
 
 mqtt_connection.on('error', function (err) {
   console.log(err)
-  mqtt_connection.end()
+  console.log("Sono qui")
+  //mqtt_connection.end()
 })
 
 
@@ -57,12 +58,14 @@ mqtt_connection.on('connect', function () {
       var status = (selection.userId) ? "active" : "inactive";
       var message = new MQTTTaskMessage(status, selection.userId, selection.userName);
       taskMessageMap.set(selection.taskId, message);
-      console.log(selection)
-      mqtt_connection.publish(String(selection.taskId), JSON.stringify(message), {qos:0});
-      
+      if(!selection.private)
+          mqtt_connection.publish(String(selection.taskId), JSON.stringify(message), {qos:1, retain:true});
+      else{
+          mqtt_connection.publish(String(selection.taskId), JSON.stringify(message), {qos:0, retain:true});
+      }
     });
     
-    mqtt_connection.subscribe("TalkWithServer", {qos:0, retain: false})
+    mqtt_connection.subscribe("ServerChannel", {qos:2, retain: true})
   }) .catch(function (error) {
     mqtt_connection.end();
   })
@@ -71,12 +74,13 @@ mqtt_connection.on('connect', function () {
 
 mqtt_connection.on('close', function () {
   console.log(clientId + ' disconnected');
+  console.log("I TRY TO RECONNECT WITH THE BROKER")
 })
 
 
 mqtt_connection.on('message', function (topic, message) {
   var parsedMessage = JSON.parse(message);
-  if(topic == "TalkWithServer"){
+  if(topic == "ServerChannel"){
     if(parsedMessage.operation == "getPublicIds"){
       Tasks.internalGetPublicTasks().then(function(response){
         response.forEach(function(singleTask){
@@ -87,7 +91,7 @@ mqtt_connection.on('message', function (topic, message) {
           else 
               console.log("Invalid: " + ajv.errorsText(validateTask.errors))
           
-          mqtt_connection.publish(String(singleTask.id), JSON.stringify(new MQTTTaskMessage("insert", null, null, singleTask)), {qos:0, retain:true})
+          mqtt_connection.publish(String(singleTask.id), JSON.stringify(new MQTTTaskMessage("insert", null, null, singleTask)), {qos:1, retain:true})
         })
 
           let tempArray = response.map(x=>x.id).sort((a,b)=> a.id<b.id?-1:1)
@@ -99,7 +103,7 @@ mqtt_connection.on('message', function (topic, message) {
          else 
             console.log("Invalid: " + ajv.errorsText(validatePublicMessage.errors))
   
-          mqtt_connection.publish("CarryPublicIds",JSON.stringify(message), {qos:0, retain:true})
+          mqtt_connection.publish("CarryPublicIds", JSON.stringify(message), {qos:2, retain:false})
             
       })
     }
@@ -109,13 +113,19 @@ mqtt_connection.on('message', function (topic, message) {
 
 
 module.exports.publishTaskMessage = function publishTaskMessage(taskId, message, myretain) {
+  console.log(typeof myretain == "boolean")
+  if (typeof myretain == "boolean") {
+    mqtt_connection.publish(String(taskId), JSON.stringify(message), { qos: 0, retain:myretain})
+  }else{
+    mqtt_connection.publish(String(taskId), JSON.stringify(message), { qos: 0, retain:true})
 
-  mqtt_connection.publish(String(taskId), JSON.stringify(message), { qos: 0, retain:myretain?myretain:true})
-
+  }
 };
 
-module.exports.publishPublicTaskMessage = function publishPublicTaskMessage(message) {
-  mqtt_connection.publish("PublicTasks", JSON.stringify(message), { qos: 0, retain:false })
+module.exports.sendPublicChannel = function sendPublicChannel(mymess) {
+  console.log(mymess)
+  mqtt_connection.publish("PublicChannel", JSON.stringify(mymess), { qos: 1, retain:false })
+
 };
 
 module.exports.saveMessage = function saveMessage(taskId, message) {

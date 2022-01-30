@@ -11,6 +11,8 @@ var nextLink;
 module.exports.addTask = function addTask(req, res, next) {
     var task = req.body;
     var owner = req.user;
+    console.log("Owner: ", owner)
+    console.log(req.body)
     Tasks.addTask(task, owner)
         .then(function(response) {
             if(response){
