@@ -166,7 +166,7 @@ exports.selectTask = function selectTask(userId, taskId) {
         db.serialize(function() {  
 
             db.run('BEGIN TRANSACTION;');
-            const sql1 = 'SELECT t.id FROM tasks as t WHERE t.id = ?';
+            const sql1 = 'SELECT t.id, t.private as private,t.important as important , t.owner as owner FROM tasks as t WHERE t.id = ?';
             db.all(sql1, [taskId], function(err, check) {
                 if (err) {
                     db.run('ROLLBACK;')
@@ -177,15 +177,16 @@ exports.selectTask = function selectTask(userId, taskId) {
                     reject(404);
                 } 
                 else {
-                    const sql2 = 'SELECT t.id FROM assignments as a, tasks as t WHERE a.user = ? AND a.task = t.id AND a.active = 1';
+                    const sql2 = 'SELECT t.id, t.private as private FROM assignments as a, tasks as t WHERE a.user = ? AND a.task = t.id AND a.active = 1';
                     db.all(sql2, [userId], function(err, rows1) {
                         if (err) {
                             db.run('ROLLBACK;')
                             reject(err);
                         } else {
                             let deselected = null;
-                            if(rows1.length !== 0) deselected = rows1[0].id;
-                            const sql3 = 'SELECT u.name, t.description FROM assignments as a, users as u, tasks as t WHERE a.user = ? AND a.task = ? AND a.user = u.id AND a.task = t.id';
+                            if(rows1.length !== 0) 
+                                deselected = rows1[0]
+                            const sql3 = 'SELECT u.name, t.description, t.private as private FROM assignments as a, users as u, tasks as t WHERE a.user = ? AND a.task = ? AND a.user = u.id AND a.task = t.id';
                             db.all(sql3, [userId, taskId], function(err, rows2) {
                                 if (err) {
                                     db.run('ROLLBACK;')
@@ -211,13 +212,20 @@ exports.selectTask = function selectTask(userId, taskId) {
                                                             //publish the MQTT message for the selected task
                                                             message = new MQTTTaskMessage("active", parseInt(userId), rows2[0].name);
                                                             mqtt.saveMessage(taskId, message);
-                                                            mqtt.publishTaskMessage(taskId, message, false);
+                                                            mqtt.publishTaskMessage(taskId, message, true);
+                                                            if(!(rows2[0].private)){
+                                                                mqtt.saveAssignedPulickTask(taskId)
+                                                            }
 
                                                             //publish the MQTT message for the selected task
                                                             if(deselected){
                                                                 message = new MQTTTaskMessage("inactive", null, null);
-                                                                mqtt.saveMessage(deselected, message);
-                                                                mqtt.publishTaskMessage(deselected, message,null);
+                                                                mqtt.saveMessage(deselected.id, message);
+                                                                mqtt.publishTaskMessage(deselected.id, message,true);
+                                                            
+                                                                if(!deselected.private){
+                                                                    mqtt.deleteAssignedPulickTask(deselected.id)
+                                                                }
                                                             }
 
                                                             //inform the clients that the user selected a different task where they are working on
@@ -258,6 +266,21 @@ exports.selectTask = function selectTask(userId, taskId) {
       });
 }
 
+exports.getPublicTaskSelections = function getPublicTaskSelections(userId) {
+    return new Promise((resolve, reject) => {
+        const sql = "SELECT temp.id, temp.assignee, u.name FROM (SELECT t.id, t.owner as owner, a.user as assignee  FROM tasks as t LEFT JOIN assignments as a ON t.id = a.task  WHERE t.owner = ? AND t.private = 0 AND a.active = 1) as temp LEFT JOIN users as u ON temp.assignee = u.id";
+        db.get(sql,[userId], (err, row) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(row);
+            }
+        });
+      });
+}
+
+
+
 exports.assignEach = function(taskId, owner) {
   return new Promise((resolve, reject) => {
       const sql = "SELECT user, MIN(Count) as MinVal FROM (SELECT user,COUNT(*) as Count FROM assignments GROUP BY user) T";
@@ -270,4 +293,22 @@ exports.assignEach = function(taskId, owner) {
           }
       });
   });
+}
+
+
+
+
+
+exports.getGedPublicTaskAssignedSelected = function getGedPublicTaskAssignedSelected(taskId) {
+    return new Promise((resolve, reject) => {
+        const sql = `SELECT t.id as id,  t.owner as owner, t.description as description, a.active as active, t.important as important, t.private as private, t.deadline as deadline, 
+        t.completed as completed, u.id as userId, u.name as userName FROM assignments AS A, users AS U , tasks as t WHERE A.task = ? AND A.active = 1 AND A.user = U.id AND A.task = t.id`;
+        db.get(sql,[taskId], (err, row) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(row);
+            }
+        });
+      });
 }

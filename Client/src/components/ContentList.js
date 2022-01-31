@@ -30,8 +30,7 @@ const TaskRowData = (props) => {
   var assignedUser = "";
 
   assignedTaskList.forEach(element => {
-    console.log("ELEMENTO DA CONTENTLIST")
-    console.log(element)
+
     if(element.status=="active"){
       if(String(element.taskId)==String(task.id)){
         assignedUser = element.userName;
@@ -45,7 +44,7 @@ const TaskRowData = (props) => {
           <Form.Group className="m-0" controlId="formBasicCheckbox">
             <Form.Check type="checkbox">
             { (filter == 'assigned')?
-              <Form.Check.Input type="radio" checked={task.active} onChange={ (ev) => onCheck(ev.target.checked)} />
+              <Form.Check.Input type="radio" checked={task.active?true:false} onChange={ (ev) => onCheck(ev.target.checked)} />
               : null
             }
               <Form.Check.Label className={labelClassName} >{task.description}</Form.Check.Label>
@@ -89,12 +88,6 @@ const ContentList = (props) => {
   const { tasks, onDelete, onEdit, onCheck, onComplete, filter, getTasks, handler, assignedTaskList } = props;
 
 
-  // handle change event
-  const handlePageChange = pageNumber => {
-      getTasks(filter, pageNumber);
-  }
-
-
   return (
     <>
       <ListGroup key={"ListTask"} as="ul" variant="flush">
@@ -117,7 +110,7 @@ const ContentList = (props) => {
           itemsCountPerPage={parseInt(localStorage.getItem("totalItems"))/parseInt(localStorage.getItem("totalPages"))}
           totalItemsCount={parseInt(localStorage.getItem("totalItems"))}
           pageRangeDisplayed={10}
-          onChange={handlePageChange}
+          onChange={getTasks}
           pageSize ={parseInt(localStorage.getItem("totalPages"))}
       />
     </>

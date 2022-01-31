@@ -1,0 +1,24 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id" : "http://www.my-schema.com/schema_server_message.json",
+    "title": "client Message",
+    "description": "JSON Schema for messages to communicate with the server",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      
+      "operation": {
+        "type": "string",
+        "description": "specifies the type of operation that the client asks. Only one operation permitted.",
+        "const": "getPublicIds"
+      },
+      "clientId": {
+        "type": "string",
+        "description": "the id of the client.",
+        "pattern": "mqttjs_([a-z0-9]?){8}"
+      }
+
+    },
+    "required": ["operation","clientId"]
+  }
+  

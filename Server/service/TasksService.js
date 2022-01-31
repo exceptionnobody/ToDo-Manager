@@ -28,12 +28,8 @@ exports.addTask = function(task, owner) {
                 if(!task.private){
                     let createdPubTask = new Task(this.lastID, task.description, task.important, task.private, task.deadline, task.project, task.completed);
 
-                console.log("Task Created: ", createdPubTask)
-                //let mess = new MQTTTaskMessage("insertPub",null,null,createdPubTask)
-                //mqtt.publishTaskMessage(String(this.lastID), mess, true)
-                let mess = new MQTTForPublicChannel("subscribe", parseInt(this.lastID), createdPubTask)
-                console.log("MESS:", mess)
-                mqtt.sendPublicChannel(mess);
+                    let mess = new MQTTForPublicChannel("subscribe", parseInt(this.lastID), createdPubTask)
+                    mqtt.sendPublicChannel(mess);
                     resolve({});
                    
                  } else{
@@ -420,35 +416,36 @@ exports.updateSingleTask2 = function (task, taskId, owner) {
                                 if(!rows[0].private && !task.private){ 
                                     // !row[0].private  && !tas.private
                                     // public task changed in public task
-                                    message = new MQTTTaskMessage("update", null, null, task);
+                                    console.log("TASK LATO SERVER RICEVUTO")
+                                    console.log(task)
+                                    task.important = task.important?true:false
+                                    task.private = task.private? true:false
+                                    task.completed = task.completed ? true:false
+                                    const {owner, ...taskWithNoOwner} = task
+                                    message = new MQTTTaskMessage("update", null, null, taskWithNoOwner);
                                     mqtt.publishTaskMessage(taskId, message, true);
                                     //mqtt.publishTaskMessage(taskId, null);
                                 }else if(rows[0].private  && task.private) { 
                                     //row[0].private != 0 && tas.private == false
                                     // private task changed in a private task
                                     // pubblico il nuovo task nel suo topic
-                                    // this case is managed in HTTP
-                                    /*task.private = 1;
-                                    task.completed = task.completed?1:0;
-                                    task.important = task.important?1:0;
-                                    message = new MQTTTaskMessage("update", owner, rows[0].name, task);
+                                    // this case is managed in 
+                                    message = new MQTTTaskMessage("inactive", null , null);
                                     
                                     mqtt.saveMessage(taskId, message);
                                     mqtt.publishTaskMessage(taskId, message,true);
-                                    */
+                                    
                                 }else if(rows[0].private  && !task.private ){
                                     //row[0].private != 0 && tas.private == false
                                     //  task private, changed in a public task
                                     message = new MQTTForPublicChannel("subscribe", taskId, task);
-                                    //let message2 = new MQTTTaskMessage("insert", null, null, task)
-                                   // mqtt.publishTaskMessage(taskId, message2, true);
                                     mqtt.sendPublicChannel(message);
                                     
                                     
                                 }else{ 
                                     // row[0].private == 0 && task.private != false
                                     //  public task, changed in a private task 
-                                    // pubblico il nuovo task nel suo topic
+                                    
                                     message = new MQTTTaskMessage("changed");
                                     mqtt.publishTaskMessage(taskId, message, true);
                                     

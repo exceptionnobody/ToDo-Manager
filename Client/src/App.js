@@ -22,7 +22,10 @@ import { Route, useRouteMatch, useHistory, Switch, Redirect, BrowserRouter as Ro
 
 import dayjs from 'dayjs';
 import isToday from 'dayjs/plugin/isToday';
+import { parse } from 'path';
+import { createConnection } from 'net';
 
+import MQTTTaskMessage from './utils/mqtt_task_message'
 
 dayjs.extend(isToday);
 
@@ -38,10 +41,10 @@ var options = {
   keepalive: 30,
   clientId: clientId,
   clean: true,
-  reconnectPeriod: 1000,
+  reconnectPeriod: 15000,
   connectTimeout: 30 * 1000,
   will: {
-    topic: 'ErrorHandling',
+    topic: 'WillMsg',
     payload: 'Connection Closed abnormally..!',
     qos: 0,
     retain: false
@@ -52,7 +55,8 @@ var host = 'ws://127.0.0.1:8080'
 var client = mqtt.connect(host, options);
 var PublicMap = new Map()
 var OwnTasksMaps = new Map()
-var AssignedTaskMaps = new Map() 
+var AssignedTasksMap = new Map()
+var AssignedAndPublicTaskMaps = new Map() 
 var temp = []
 var index;
 var TestLista = new Map()
@@ -101,12 +105,19 @@ const Main = () => {
   const activeFilter = (match && match.params && match.params.filter) ? match.params.filter : 'owned';
 
   const [errorType, setErrorType] = useState({type:'', msg:''})
-  const [filtroTemporaneo, setFiltroTemporaneo ] = useState("owned")
+  const [filtroTemporaneo, setFiltroTemporaneo ] = useState(activeFilter)
   const history = useHistory();
   // if another filter is selected, redirect to a new view/url
   const handleSelectFilter = (filter) => {
     history.push("/list/" + filter);
   }
+
+  const handleSelectFilter2 = (filter) => {
+    setFiltroTemporaneo(filter)
+    history.push("/list/" + filter);
+    localStorage.setItem("currentPage", '1')
+  }
+
 
 
   function forManagingWebSocketConnection(){
@@ -195,41 +206,31 @@ const Main = () => {
 
     client.on('connect', function () {
       console.log('client connected:' + clientId)
-      if(numOfConnection == 1){
-        // all ok
+      if(numOfConnection === 1){
+      
         client.publish("ServerChannel", JSON.stringify({operation:"getPublicIds", clientId:clientId}),{qos:2, retain:true})
         client.subscribe("CarryPublicIds", { qos: 2, retain: true })
         localStorage.setItem("currentPublicPage", '1')
       }else{
-        // I must invalidate what I had
-        // First: I must unsubscribe all old public tasks that I had
-        for(const elem of PublicMap.values())
-          client.unsubscribe(String(elem.id))
-        // Second: I have to clean the map od public tasks
-        PublicMap.clear();
-        setPubTasks([])
+        alert("Connection re-establish again")
         // then I can perform the same operations
-        client.publish("ServerChannel", JSON.stringify({operation:"getPublicIds"}),{qos:2, retain:true})
+        client.publish("ServerChannel", JSON.stringify({operation:"getPublicIds", clientId:clientId}),{qos:2, retain:true})
         client.subscribe("CarryPublicIds", { qos: 2, retain: false })
         
         localStorage.setItem("currentPublicPage", '1')
-        console.log("RICOOOOONNESSIONEEEEEE")
 
         if(loggedIn){
-          // If I am logged in, I must invalidate my tasks 
-          for(const elem of OwnTasksMaps.values())
-            client.unsubscribe(String(elem.id))
-
-          OwnTasksMaps.clear()
-
-          refreshTasks(activeFilter, 1)
+          refreshTasks(filtroTemporaneo, 1)
+          setUser(user)
         }
+        numOfConnection=1;
 
       }
     })
 
     client.on('reconnect', function () {
       console.log('Reconnecting...')
+      alert("We are trying to re-establish the connection again. Tasks could not be up to date!")
     })
 
     client.on('message', function (topic, messageBroker) {
@@ -240,32 +241,81 @@ const Main = () => {
           
           if (parsedMessage.status == "deleted" || parsedMessage.status == "changed"){
             removeOrDeletePublicTasks(topic, parsedMessage)
-            if(loggedIn)
-              displayTaskSelection(topic, parsedMessage);
+            displayTaskSelection(topic, parsedMessage);
+            if(loggedIn){
+              OwnTasksMaps.delete(parseInt(topic))
+              let temporalState =  ([...OwnTasksMaps.values()].filter((item) => item.id !== parseInt(topic))).sort((a,b)=>parseInt(a.id)<parseInt(b.id)?-1:1)
+              let totalPages= Math.ceil(temporalState.length / constants.OFFSET);
+              let totalItems = temporalState.length;
+              localStorage.setItem('totalPages',totalPages.toString());
+              localStorage.setItem('totalItems',totalItems.toString());
+              
+              if(totalItems%constants.OFFSET){
+                let pageNumber = Number(localStorage.getItem('currentPage'))
+                setTaskList(temporalState.filter((x,j)=> {if(j>=(pageNumber-1)*constants.OFFSET && j < (pageNumber)*constants.OFFSET) return x}))
+              }else{
+                  let num = Number(localStorage.getItem('currentPage'))
+                  if(num > 1){
+                    num-=1
+                    localStorage.setItem('currentPage', String(num))
+                    setTaskList(temporalState.filter((x,j)=> (j>=(num-1)*constants.OFFSET && j < (num)*constants.OFFSET)))
+                  }else{
+                    
+                    localStorage.setItem('currentPage', String(num))
+                    setTaskList(temporalState.filter((x,j)=> (j>=(num-1)*constants.OFFSET && j < (num)*constants.OFFSET) ))
+                  }
+              }
+            }
+          } 
+          
+          if (parsedMessage.status == "active" || parsedMessage.status == "inactive"){
+
+           displayTaskSelection(topic, parsedMessage);
+
+          if(parsedMessage.task){
+
+            AssignedAndPublicTaskMaps.set(parseInt(topic), parsedMessage)
+            client.subscribe(String(topic), {qos:1, retain: true})
+            PublicMap.set(parseInt(topic), parsedMessage["task"])
+            addPublicTask(parsedMessage.task, "insert")
+
+             }
+             if(loggedIn){
+               console.log("Vediamo che sputa: ",parsedMessage["tasks"]["id"])
+               OwnTasksMaps.set(parsedMessage["tasks"]["id"], parsedMessage["task"])
+              let newArray = [...OwnTasksMaps.values()].sort((a,b)=>parseInt(a.id) < parseInt(b.id) ? -1:1)
+              let totalPages= Math.ceil(newArray.length / constants.OFFSET);
+              let totalItems = newArray.length;
+    
+            let oldTotalPages = localStorage.getItem('totalPages')
+    
+            localStorage.setItem('totalItems',totalItems.toString());
+    
+             let pageNumber = Number(localStorage.getItem('currentPage'))
+
+    if(oldTotalPages == totalPages){
+            refreshTasks(filtroTemporaneo, pageNumber)
+    }else{
+      localStorage.setItem('totalItems',totalPublicPages.toString());
+          refreshTasks(filtroTemporaneo, pageNumber+1)
+    }
+
+            }
+           
           }
-          
-          if (parsedMessage.status == "active" || parsedMessage.status == "inactive")
-          console.log("Debug task attivi e inattivi")
-          console.log(parsedMessage)
-            if(loggedIn)
-             displayTaskSelection(topic, parsedMessage);
-          
 
-          if (parsedMessage.status == "update"){
+        if (parsedMessage.status == "update"){
             
-            console.log("Message: ",JSON.parse(messageBroker))
-
             aggiornaTasks(topic, parsedMessage);
+
             if(loggedIn)
               displayTaskSelection(topic, parsedMessage);
           }
           
           if (parsedMessage.status == "insert" && parsedMessage.userId == clientId){
-            numMessage +=1
-            console.log(numMessage)
+
             addPublicTask(parsedMessage.task, "insert")
-            if(loggedIn)  
-              displayTaskSelection(topic, parsedMessage.task)
+            displayTaskSelection(topic, parsedMessage.task)
 
           }
 
@@ -277,10 +327,6 @@ const Main = () => {
             if (parsedMessage.type == "subscribe"){
               client.subscribe(String(parsedMessage.id), { qos: 1, retain: true })
               
-
-              numMessage +=1
-              console.log(numMessage)
-              console.log(parsedMessage)
               addPublicTask(parsedMessage,"subscribe")
               if(loggedIn)  
                 displayTaskSelection(topic, parsedMessage.task)
@@ -316,10 +362,14 @@ const Main = () => {
     })
 
     client.on('close', function () {
-      //alert("Error: Broker not reachable")
-      setErrorType()
+      
+      //setErrorType()
       console.log(clientId + ' disconnected');
-      numOfConnection+=1;
+      if(numOfConnection==1){
+        alert("Connection lost, server not reachable")
+        numOfConnection+=1;
+      }
+      
     })
 
 
@@ -374,7 +424,7 @@ const Main = () => {
   // set dirty to true only if acfiveFilter changes, if the active filter is not changed dirty = false avoids triggering a new fetch
   useEffect(() => {
     setDirty(true);
-  }, [activeFilter])
+  }, [filtroTemporaneo])
 
 
   function addPublicTask(messageBroker, typeMess) {
@@ -403,9 +453,7 @@ const Main = () => {
   }
 
   function removeOrDeletePublicTasks(topic, mess) {
-    console.log(clientId)
-    console.log("MAPPA",OwnTasksMaps)
-    
+
     if(mess.status == "changed"){
       if(!OwnTasksMaps.has(parseInt(topic)))
          client.unsubscribe(String(topic))
@@ -413,7 +461,6 @@ const Main = () => {
         client.unsubscribe(String(topic))
     }
     if(PublicMap.has(parseInt(topic))){
-      console.log("Sono qui: ", topic)
     PublicMap.delete(parseInt(topic))
     let temporalState =  ([...PublicMap.values()].filter((item) => item.id !== parseInt(topic))).sort((a,b)=>parseInt(a.id)<parseInt(b.id)?-1:1)
     totalPublicPages= Math.ceil(temporalState.length / constants.OFFSET);
@@ -440,11 +487,7 @@ const Main = () => {
   }
 
   function aggiornaTasks(topic, messageBroker) {
-    console.log("UPDATE TASK")
-
-    console.log("topic: ", topic)
-    console.log(messageBroker)
-    
+  
     if(!messageBroker.task["private"]){
       PublicMap.set(parseInt(topic), messageBroker.task)
       setPubTasks(oldstate => {
@@ -474,33 +517,23 @@ const Main = () => {
   const displayTaskSelection = (topic, parsedMessage) => {
     handler.emit(topic, parsedMessage);
 
-    index = assignedTaskList.findIndex(x => x.taskId == parseInt(topic));
+    index = temp.findIndex(x => x.taskId == parseInt(topic));
     let objectStatus = { taskId: topic, userName: parsedMessage.userName, status: parsedMessage.status };
-    console.log("ObjectStatus", objectStatus)
-    console.log(index)
-    if(index === -1){
-      setAssignedTaskList(oldState => {return [...oldState, objectStatus]})
-    }else{
-      setAssignedTaskList(oldState => {
-      
-        let newState = oldState.map((item, j) => {
-  
-          if (j == index)
-            return objectStatus
-          else
-            return item
-        })
-        return newState
-      
 
-    })
+    if(index === -1){
+      temp.push(objectStatus)
+      setAssignedTaskList(temp)
+    }else{
+      temp[index] = objectStatus
+      setAssignedTaskList(temp)
     }
-    setDirty(true);
+  
+    
+      setDirty(true)
   }
 
  const messageReceived = function(event) {
     let datas = JSON.parse(event.data.toString());
-    console.log("DATAS: ",datas)
     if (datas.typeMessage == "login") {
 
       if(!TestLista.has(datas.userId)){
@@ -518,18 +551,7 @@ const Main = () => {
           }
           return 0;
         })
-        /*console.log(test.sort((a, b) => {
-          let fa = a.userName.toLowerCase();
-          let fb = b.userName.toLowerCase();
-
-          if (fa < fb) {
-            return -1;
-          }
-          if (fa > fb) {
-            return 1;
-          }
-          return 0;
-        }))*/
+      
         setOnlineList(test)
       
     }
@@ -588,11 +610,17 @@ const Main = () => {
 
 
   const deleteTask = (task) => {
-    API.deleteTask(task)
-      .then(() =>{ 
-      OwnTasksMaps.delete(task.id)
-      setDirty(true)})
-      .catch(e => handleErrors(e))
+    if(task.private)
+      API.deleteTask(task)
+        .then(() =>{ 
+       OwnTasksMaps.delete(task.id)
+        setDirty(true)})
+        .catch(e => handleErrors(e))
+      else{
+        client.publish("PublicChannel", JSON.stringify(new MQTTTaskMessage("cancella", user.id, user.userName, task)), {qos:1, retain:false})
+        
+        refreshTasks(filtroTemporaneo)
+      }
   }
 
   const completeTask = (task) => {
@@ -611,13 +639,13 @@ const Main = () => {
       API.getTasks('owned')
         .then(tasks => {
           for (const element of tasks) {
-            if (!OwnTasksMaps.has(element.id)) {
+            if (!OwnTasksMaps.has(element.id) && !PublicMap.has(element.id)) {
               client.subscribe(String(element.id), { qos: 0, retain: true });
-              console.log("Subscribing to " + element.id)
               OwnTasksMaps.set(element.id, element)
              }
           }
           setTaskList(tasks);
+          setFiltroTemporaneo("owned")
         })
         .catch(e => handleErrors(e));
     }
@@ -635,6 +663,7 @@ const Main = () => {
   }
 
   const getAllOwnedTasks = () => {
+
     API.getAllOwnedTasks()
       .then(tasks => {
         setOwnedTaskList(tasks);
@@ -654,21 +683,19 @@ const Main = () => {
     
     API.getTasks(filter, page)
       .then(tasks => {
-        console.log("FILTER: ", filter)
         if(filter == "owned"){
           for (const element of tasks) {
             if (!OwnTasksMaps.has(element.id) && !PublicMap.has(element.id)) {
-              client.subscribe(String(element.id), { qos: 0, retain: true });
+              client.subscribe(String(element.id), { qos: 1, retain: true });
               OwnTasksMaps.set(element.id, element)
             }
           }
           setOwnedTaskList(tasks);
         }else{
-          console.log("Sono qui")
           for (const element of tasks) {
-            if (!AssignedTaskMaps.has(element.id)&&!PublicMap.has(element.id)) {
-              client.subscribe(String(element.id), { qos: 0, retain: true });
-              AssignedTaskMaps.set(element.id, element)
+            if (!AssignedAndPublicTaskMaps.has(element.id)&&!PublicMap.has(element.id)) {
+              client.subscribe(String(element.id), { qos: 1, retain: true });
+              AssignedAndPublicTaskMaps.set(element.id, element)
             }
           }
 
@@ -710,27 +737,49 @@ const Main = () => {
 
   const selectTask = (task) => {
     API.selectTask(task)
-      .then(() => setDirty(true))
+      .then(() => {
+        setDirty(true)
+      })
       .catch(e => { alert('Task is already active for another user!'); handleErrors(e); })
   }
 
 
   useEffect(() => {
     if (loggedIn && dirty) {
-      API.getTasks(activeFilter, localStorage.getItem('currentPage'))
+      API.getTasks(filtroTemporaneo, localStorage.getItem('currentPage'))
         .then(tasks => {
-          for (const element of tasks) {
-            if (!OwnTasksMaps.has(element.id)) {
-              client.subscribe(String(element.id), { qos: 0, retain: true });
+          if(filtroTemporaneo == "owned"){
+            for (const element of tasks) {
+              /*if (!OwnTasksMaps.has(element.id) && !PublicMap.has(element.id) && !AssignedAndPublicTaskMaps.has(element.id)) {
+              client.subscribe(String(element.id), { qos: 1, retain: true });
               OwnTasksMaps.set(element.id, element)
-             }
-          }
-          setTaskList(tasks);
+              }*/
+              if (!OwnTasksMaps.has(element.id)) {
+                client.subscribe(String(element.id), { qos: 1, retain: true });
+                OwnTasksMaps.set(element.id, element)
+                }
+          }        
+
           setDirty(false);
+          setTimeout(setTaskList, 200, tasks);
+          }else{
+
+
+            for (const element of tasks) {
+              if(!AssignedTasksMap.has(element.id)  && !PublicMap.has(element.id) && !AssignedAndPublicTaskMaps.has(element.id)) {
+              client.subscribe(String(element.id), { qos: 1, retain: true });
+              AssignedTasksMap.set(element.id, element)
+              }
+            }
+
+              setDirty(false);
+              setTimeout(setTaskList, 200, tasks);
+          }
+          
         })
         .catch(e => handleErrors(e));
     }
-  }, [activeFilter, dirty, loggedIn, user])
+  }, [filtroTemporaneo, dirty, loggedIn, user])
 
   // show error message in toast
   const handleErrors = (err) => {
@@ -744,11 +793,12 @@ const Main = () => {
 
     // if the task has an id it is an update
     if (task.id) {
+     if(task.private) 
       API.updateTask(task)
         .then(response => {
           if (response.ok) {
             OwnTasksMaps.set(task.id, task)
-            API.getTasks(activeFilter, localStorage.getItem('currentPage'))
+            API.getTasks(filtroTemporaneo, localStorage.getItem('currentPage'))
               .then(tasks => {
                 for (const element of tasks) {
                   if (!OwnTasksMaps.has(element.id)) {
@@ -760,15 +810,23 @@ const Main = () => {
               }).catch(e => handleErrors(e));
           }
         }).catch(e => handleErrors(e));
-
-      // otherwise it is a new task to add
+       else 
+           client.publish("PublicChannel", JSON.stringify(new MQTTTaskMessage("aggiorna", user.id, user.userName, task)), {qos:1, retain:false})
+          setDirty(true)
+           // otherwise it is a new task to add
     } else {
-      API.addTask(task)
+      if(task.private)
+        API.addTask(task)
         .then(() => {
           setDirty(true)})
         .catch(e => handleErrors(e));
-    }
-    setSelectedTask(MODAL.CLOSED);
+
+        console.log("creo il task con mqtt")
+        
+        client.publish("PublicChannel", JSON.stringify(new MQTTTaskMessage("creation", parseInt(user.id), user.userName, task)), {qos:1, retain:false})
+        setDirty(true)
+      }
+      setSelectedTask(MODAL.CLOSED);
   }
 
   const handleEdit = (task) => {
@@ -782,10 +840,8 @@ const Main = () => {
   const doLogIn = async (credentials) => {
     try { 
       const LoggedUser = await API.logIn(credentials);
-
       setUser(LoggedUser);
       setLoggedIn(true);
-      localStorage.setItem("currentPublicPage",'1')
     }
     catch (err) {
       // error is handled and visualized in the login form, do not manage error, throw it
@@ -793,22 +849,31 @@ const Main = () => {
     }
   }
 
+
+
+    // handle change event
+  const handlePageChange = pageNumber => {
+    refreshTasks(filtroTemporaneo, pageNumber);
+  }
+
+
   const handleLogOut = async () => {
     // clean up everything
 
-    for(const val of OwnTasksMaps.values()){
-      console.log(val)
-      if(val["private"]){
+    if(OwnTasksMaps.size !== 0){
+      for(const val of OwnTasksMaps.values()){
         client.unsubscribe(String(val.id))
-        console.log("Unsubscribe of topic: ", val.id)
       }
      }
+
     OwnTasksMaps.clear()
     TestLista.clear()
     setLoggedIn(false);
+    setAssignedTaskList([])
     setUser(null);
     setTaskList([]);
     setDirty(true);
+    setFiltroTemporaneo("owner");
 
     await API.logOut()
     localStorage.removeItem('totalPages');
@@ -818,7 +883,7 @@ const Main = () => {
     localStorage.removeItem('userId');
     localStorage.removeItem('email');
     localStorage.removeItem('username');
-
+    
   }
 
 
@@ -845,7 +910,7 @@ const Main = () => {
           <Row className="vheight-100">
             <Col sm={3} bg="light" className="d-block col-4" id="left-sidebar">
               <span>&nbsp;&nbsp;</span>
-              <MiniOnlineList onlineList={onlineList} />
+              {loggedIn && <MiniOnlineList onlineList={onlineList} />}
             </Col>
             <Col className="col-8">
               <Row className="vh-100 below-nav">
@@ -859,7 +924,7 @@ const Main = () => {
           <Row className="vheight-100">
             <Col sm={3} bg="light" className="d-block col-4" id="left-sidebar">
               <span>&nbsp;&nbsp;</span>
-              <MiniOnlineList onlineList={onlineList} />
+              {loggedIn && <MiniOnlineList onlineList={onlineList} />}
             </Col>
             <Col sm={8} className="below-nav">
               <h5><strong>Online Users</strong></h5>
@@ -887,7 +952,7 @@ const Main = () => {
         <Route path={["/list/:filter"]}>
           {loggedIn ?
             <Row className="vh-100 below-nav">
-              <TaskMgr taskList={taskList} filter={activeFilter} onDelete={deleteTask} onEdit={handleEdit} onComplete={completeTask} onCheck={selectTask} onSelect={handleSelectFilter} refreshTasks={refreshTasks} onlineList={onlineList} myhandler={handler} assignedTaskList={assignedTaskList}></TaskMgr>
+              <TaskMgr taskList={taskList} filter={filtroTemporaneo} onDelete={deleteTask} onEdit={handleEdit} onComplete={completeTask} onCheck={selectTask} onSelect={handleSelectFilter2} handlePageChange={handlePageChange} onlineList={onlineList} myhandler={handler} assignedTaskList={assignedTaskList}></TaskMgr>
               <Button variant="success" size="lg" className="fixed-right-bottom" onClick={() => setSelectedTask(MODAL.ADD)}>+</Button>
               {(selectedTask !== MODAL.CLOSED) && <ModalForm task={findTask(selectedTask)?findTask(selectedTask):null} onSave={handleSaveOrUpdate} onClose={handleClose}></ModalForm>}
             </Row> : <Redirect to="/login" />
@@ -906,8 +971,7 @@ const Main = () => {
 
 const TaskMgr = (props) => {
 
-  const { taskList, filter, onDelete, onEdit, onComplete, onCheck, onSelect, refreshTasks, onlineList, myhandler, assignedTaskList } = props;
-
+  const { taskList, filter, onDelete, onEdit, onComplete, onCheck, onSelect, handlePageChange, onlineList, myhandler, assignedTaskList } = props;
 
   // ** FILTER DEFINITIONS **
   const filters = {
@@ -928,7 +992,7 @@ const TaskMgr = (props) => {
         <h1 className="pb-3">Filter: <small className="text-muted">{activeFilter}</small></h1>
         <ContentList
           tasks={taskList}
-          onDelete={onDelete} onEdit={onEdit} onCheck={onCheck} onComplete={onComplete} filter={activeFilter} getTasks={refreshTasks}
+          onDelete={onDelete} onEdit={onEdit} onCheck={onCheck} onComplete={onComplete} filter={activeFilter} getTasks={handlePageChange}
           handler={myhandler} assignedTaskList={assignedTaskList}
         />
       </Col>
