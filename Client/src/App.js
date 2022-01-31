@@ -253,6 +253,7 @@ const Main = () => {
               if(totalItems%constants.OFFSET){
                 let pageNumber = Number(localStorage.getItem('currentPage'))
                 setTaskList(temporalState.filter((x,j)=> {if(j>=(pageNumber-1)*constants.OFFSET && j < (pageNumber)*constants.OFFSET) return x}))
+                refreshTasks(filtroTemporaneo, pageNumber)
               }else{
                   let num = Number(localStorage.getItem('currentPage'))
                   if(num > 1){
@@ -280,27 +281,7 @@ const Main = () => {
             addPublicTask(parsedMessage.task, "insert")
 
              }
-             if(loggedIn){
-               console.log("Vediamo che sputa: ",parsedMessage["tasks"]["id"])
-               OwnTasksMaps.set(parsedMessage["tasks"]["id"], parsedMessage["task"])
-              let newArray = [...OwnTasksMaps.values()].sort((a,b)=>parseInt(a.id) < parseInt(b.id) ? -1:1)
-              let totalPages= Math.ceil(newArray.length / constants.OFFSET);
-              let totalItems = newArray.length;
-    
-            let oldTotalPages = localStorage.getItem('totalPages')
-    
-            localStorage.setItem('totalItems',totalItems.toString());
-    
-             let pageNumber = Number(localStorage.getItem('currentPage'))
-
-    if(oldTotalPages == totalPages){
-            refreshTasks(filtroTemporaneo, pageNumber)
-    }else{
-      localStorage.setItem('totalItems',totalPublicPages.toString());
-          refreshTasks(filtroTemporaneo, pageNumber+1)
-    }
-
-            }
+             
            
           }
 
@@ -316,6 +297,27 @@ const Main = () => {
 
             addPublicTask(parsedMessage.task, "insert")
             displayTaskSelection(topic, parsedMessage.task)
+            if(loggedIn){
+              console.log("Vediamo che sputa: ",parsedMessage["tasks"]["id"])
+              OwnTasksMaps.set(parsedMessage["tasks"].id, parsedMessage["task"])
+             let newArray = [...OwnTasksMaps.values()].sort((a,b)=>parseInt(a.id) < parseInt(b.id) ? -1:1)
+             let totalPages= Math.ceil(newArray.length / constants.OFFSET);
+             let totalItems = newArray.length;
+   
+           let oldTotalPages = localStorage.getItem('totalPages')
+   
+           localStorage.setItem('totalItems',totalItems.toString());
+   
+            let pageNumber = Number(localStorage.getItem('currentPage'))
+
+   if(oldTotalPages == totalPages){
+           refreshTasks(filtroTemporaneo, pageNumber)
+   }else{
+     localStorage.setItem('totalItems',totalItems.toString());
+         refreshTasks(filtroTemporaneo, pageNumber+1)
+   }
+
+           }
 
           }
 

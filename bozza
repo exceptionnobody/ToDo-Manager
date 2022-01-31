@@ -17,4 +17,8 @@ Description: it carries all the public ids of the tasks in the moment of the cli
              a temporary channel to allow the client to obtain all the last ids of the public tasks.
 
 Client QoS when it subscribes: 2
-Server
+Server Qos when it subscribes: 2
+
+retain: false
+
+Using mqtt implementation in the client, the pagination does not work exactly, instead using HTTP pagination works well.

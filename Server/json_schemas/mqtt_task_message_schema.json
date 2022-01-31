@@ -13,7 +13,7 @@
     "status": {
       "type": "string",
       "description": "current condition of the task (the available types are active if it is selected by a user, inactive if it is not selected by any user, or deleted if it has been removed from the service)",
-      "enum": ["active", "inactive", "deleted", "insert", "update", "changed"] 
+      "enum": ["active", "aggiorna", "cancella", "creation", "inactive", "deleted", "insert", "update", "changed"] 
     },
     "userId": {
       "type": ["integer", "string"],
@@ -70,6 +70,33 @@
        "required": ["status"]
      }   
       },
+      {
+        "if": {
+          "properties": {"status": {"const": "creation"}}
+        },
+        "then":{
+          "required": ["status", "userId", "userName", "task"]
+        }   
+      },
+      
+        {
+          "if": {
+            "properties": {"status": {"const": "aggiorna"}}
+          },
+          "then":{
+            "required": ["status",  "task"]
+          }   
+        },
+
+      {
+          "if": {
+            "properties": {"status": {"const": "cancella"}}
+          },
+          "then":{
+            "required": ["status",  "task"]
+          }   
+        },
+
       {
         "if":{
           "properties":{"status":{"const": "update"}}
