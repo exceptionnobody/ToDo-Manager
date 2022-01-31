@@ -260,10 +260,14 @@ const Main = () => {
                     num-=1
                     localStorage.setItem('currentPage', String(num))
                     setTaskList(temporalState.filter((x,j)=> (j>=(num-1)*constants.OFFSET && j < (num)*constants.OFFSET)))
+                    refreshTasks(filtroTemporaneo, num)
+
                   }else{
                     
                     localStorage.setItem('currentPage', String(num))
                     setTaskList(temporalState.filter((x,j)=> (j>=(num-1)*constants.OFFSET && j < (num)*constants.OFFSET) ))
+                    refreshTasks(filtroTemporaneo, num)
+
                   }
               }
             }
@@ -311,9 +315,12 @@ const Main = () => {
             let pageNumber = Number(localStorage.getItem('currentPage'))
 
    if(oldTotalPages == totalPages){
+    setTaskList(newArray.filter((x,j)=> {if(j>=(pageNumber-1)*constants.OFFSET && j < (pageNumber)*constants.OFFSET) return x}))
            refreshTasks(filtroTemporaneo, pageNumber)
    }else{
      localStorage.setItem('totalItems',totalItems.toString());
+     setTaskList(newArray.filter((x,j)=> {if(j>=(pageNumber-1)*constants.OFFSET && j < (pageNumber)*constants.OFFSET) return x}))
+
          refreshTasks(filtroTemporaneo, pageNumber+1)
    }
 
