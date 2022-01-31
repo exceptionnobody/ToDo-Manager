@@ -211,7 +211,7 @@ exports.selectTask = function selectTask(userId, taskId) {
                                                             //publish the MQTT message for the selected task
                                                             message = new MQTTTaskMessage("active", parseInt(userId), rows2[0].name);
                                                             mqtt.saveMessage(taskId, message);
-                                                            mqtt.publishTaskMessage(taskId, message,null);
+                                                            mqtt.publishTaskMessage(taskId, message, false);
 
                                                             //publish the MQTT message for the selected task
                                                             if(deselected){

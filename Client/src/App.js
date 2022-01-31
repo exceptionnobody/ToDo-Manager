@@ -51,7 +51,8 @@ var options = {
 var host = 'ws://127.0.0.1:8080'
 var client = mqtt.connect(host, options);
 var PublicMap = new Map()
-var OwnTasksMaps = new Map() 
+var OwnTasksMaps = new Map()
+var AssignedTaskMaps = new Map() 
 var temp = []
 var index;
 var TestLista = new Map()
@@ -63,6 +64,7 @@ var constants = Object.freeze({
   OFFSET: 10,
 });
 
+var numMessage=0;
 
 const App = () => {
 
@@ -99,7 +101,7 @@ const Main = () => {
   const activeFilter = (match && match.params && match.params.filter) ? match.params.filter : 'owned';
 
   const [errorType, setErrorType] = useState({type:'', msg:''})
-
+  const [filtroTemporaneo, setFiltroTemporaneo ] = useState("owned")
   const history = useHistory();
   // if another filter is selected, redirect to a new view/url
   const handleSelectFilter = (filter) => {
@@ -195,7 +197,7 @@ const Main = () => {
       console.log('client connected:' + clientId)
       if(numOfConnection == 1){
         // all ok
-        client.publish("ServerChannel", JSON.stringify({operation:"getPublicIds"}),{qos:2, retain:true})
+        client.publish("ServerChannel", JSON.stringify({operation:"getPublicIds", clientId:clientId}),{qos:2, retain:true})
         client.subscribe("CarryPublicIds", { qos: 2, retain: true })
         localStorage.setItem("currentPublicPage", '1')
       }else{
@@ -232,7 +234,6 @@ const Main = () => {
 
     client.on('message', function (topic, messageBroker) {
       try {
-        console.log("MESSAGEBROKER: ",JSON.parse(messageBroker))
         var parsedMessage = JSON.parse(messageBroker);
 
         if (topic != "PublicChannel" && topic != "CarryPublicIds") {
@@ -244,18 +245,25 @@ const Main = () => {
           }
           
           if (parsedMessage.status == "active" || parsedMessage.status == "inactive")
+          console.log("Debug task attivi e inattivi")
+          console.log(parsedMessage)
             if(loggedIn)
              displayTaskSelection(topic, parsedMessage);
           
 
           if (parsedMessage.status == "update"){
+            
+            console.log("Message: ",JSON.parse(messageBroker))
+
             aggiornaTasks(topic, parsedMessage);
             if(loggedIn)
               displayTaskSelection(topic, parsedMessage);
           }
           
-          if (parsedMessage.status == "insert"){
-            addPublicTask(parsedMessage.task)
+          if (parsedMessage.status == "insert" && parsedMessage.userId == clientId){
+            numMessage +=1
+            console.log(numMessage)
+            addPublicTask(parsedMessage.task, "insert")
             if(loggedIn)  
               displayTaskSelection(topic, parsedMessage.task)
 
@@ -268,6 +276,17 @@ const Main = () => {
           if(topic == "PublicChannel"){
             if (parsedMessage.type == "subscribe"){
               client.subscribe(String(parsedMessage.id), { qos: 1, retain: true })
+              
+
+              numMessage +=1
+              console.log(numMessage)
+              console.log(parsedMessage)
+              addPublicTask(parsedMessage,"subscribe")
+              if(loggedIn)  
+                displayTaskSelection(topic, parsedMessage.task)
+  
+
+
             }
           }
 
@@ -358,9 +377,12 @@ const Main = () => {
   }, [activeFilter])
 
 
-  function addPublicTask(messageBroker) {
-    PublicMap.set(parseInt(messageBroker.id), messageBroker)
-        
+  function addPublicTask(messageBroker, typeMess) {
+    if(typeMess == "insert")
+      PublicMap.set(parseInt(messageBroker.id), messageBroker)
+    else
+      PublicMap.set(parseInt(messageBroker.id), messageBroker.task)
+
     let newArray = [...PublicMap.values()].sort((a,b)=>parseInt(a.id) < parseInt(b.id) ? -1:1)
     totalPublicPages= Math.ceil(newArray.length / constants.OFFSET);
     totalPublicItems = newArray.length;
@@ -452,15 +474,26 @@ const Main = () => {
   const displayTaskSelection = (topic, parsedMessage) => {
     handler.emit(topic, parsedMessage);
 
-    index = temp.findIndex(x => parseInt(x.taskId) == parseInt(topic));
+    index = assignedTaskList.findIndex(x => x.taskId == parseInt(topic));
     let objectStatus = { taskId: topic, userName: parsedMessage.userName, status: parsedMessage.status };
-
+    console.log("ObjectStatus", objectStatus)
+    console.log(index)
     if(index === -1){
-      temp.push(objectStatus)
-      setAssignedTaskList(temp)
+      setAssignedTaskList(oldState => {return [...oldState, objectStatus]})
     }else{
-        temp[index] = objectStatus
-        setAssignedTaskList(temp)
+      setAssignedTaskList(oldState => {
+      
+        let newState = oldState.map((item, j) => {
+  
+          if (j == index)
+            return objectStatus
+          else
+            return item
+        })
+        return newState
+      
+
+    })
     }
     setDirty(true);
   }
@@ -621,14 +654,27 @@ const Main = () => {
     
     API.getTasks(filter, page)
       .then(tasks => {
-        for (const element of tasks) {
-          if (!OwnTasksMaps.has(element.id)) {
-            client.subscribe(String(element.id), { qos: 0, retain: true });
-            OwnTasksMaps.set(element.id, element)
-           }
+        console.log("FILTER: ", filter)
+        if(filter == "owned"){
+          for (const element of tasks) {
+            if (!OwnTasksMaps.has(element.id) && !PublicMap.has(element.id)) {
+              client.subscribe(String(element.id), { qos: 0, retain: true });
+              OwnTasksMaps.set(element.id, element)
+            }
+          }
+          setOwnedTaskList(tasks);
+        }else{
+          console.log("Sono qui")
+          for (const element of tasks) {
+            if (!AssignedTaskMaps.has(element.id)&&!PublicMap.has(element.id)) {
+              client.subscribe(String(element.id), { qos: 0, retain: true });
+              AssignedTaskMaps.set(element.id, element)
+            }
+          }
+
         }
         setTaskList(tasks);
-        setOwnedTaskList(tasks);
+        
         setDirty(false);
       })
       .catch(e => handleErrors(e));

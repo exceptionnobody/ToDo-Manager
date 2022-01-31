@@ -54,6 +54,7 @@ mqtt_connection.on('connect', function () {
   console.log('client connected:' + clientId)
 
   Assignments.getTaskSelections().then(function (selections) {
+    console.log(selections)
     selections.forEach(function(selection){
       var status = (selection.userId) ? "active" : "inactive";
       var message = new MQTTTaskMessage(status, selection.userId, selection.userName);
@@ -91,7 +92,7 @@ mqtt_connection.on('message', function (topic, message) {
           else 
               console.log("Invalid: " + ajv.errorsText(validateTask.errors))
           
-          mqtt_connection.publish(String(singleTask.id), JSON.stringify(new MQTTTaskMessage("insert", null, null, singleTask)), {qos:1, retain:true})
+          mqtt_connection.publish(String(singleTask.id), JSON.stringify(new MQTTTaskMessage("insert", parsedMessage.clientId, null, singleTask)), {qos:1, retain:true})
         })
 
           let tempArray = response.map(x=>x.id).sort((a,b)=> a.id<b.id?-1:1)

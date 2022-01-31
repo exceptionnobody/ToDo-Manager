@@ -30,6 +30,8 @@ const TaskRowData = (props) => {
   var assignedUser = "";
 
   assignedTaskList.forEach(element => {
+    console.log("ELEMENTO DA CONTENTLIST")
+    console.log(element)
     if(element.status=="active"){
       if(String(element.taskId)==String(task.id)){
         assignedUser = element.userName;
